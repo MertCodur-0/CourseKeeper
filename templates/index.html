@@ -12,6 +12,14 @@
         <!-- SOL: takvim alanı. İçinde kayan takvim ve sabit duran "+" butonu var. -->
         <div class="takvim-alani">
 
+            <!-- Hafta gezinme satırı: önceki hafta, bu haftaya dön, sonraki hafta. -->
+            <nav class="hafta-gezinme">
+                <button type="button" id="onceki-hafta" title="Önceki hafta" aria-label="Önceki hafta">‹</button>
+                <button type="button" id="bugune-don" title="Bu haftaya dön">Bugün</button>
+                <button type="button" id="sonraki-hafta" title="Sonraki hafta" aria-label="Sonraki hafta">›</button>
+                <span class="hafta-yazisi" id="hafta-yazisi"></span>
+            </nav>
+
             <!-- Haftalık takvim. Hem yatay hem dikey kayan tek alan. -->
             <section class="takvim" id="takvim">
                 <!-- Satır sayısı ve ilk saat Python'dan gelir, CSS bunları hesaplarda kullanır. -->
@@ -20,11 +28,17 @@
                     <!-- Sol üst köşe: bugünün tarihi -->
                     <div class="kose">{{ bugun_yazisi }}</div>
 
-                    <!-- Gün başlıkları -->
+                    <!-- Gün başlıkları (hafta değişince tarihleri JavaScript günceller) -->
                     {% for gun in gunler %}
-                    <div class="gun-baslik{% if gun.bugun_mu %} bugun{% endif %}">
+                    <div class="gun-baslik{% if gun.bugun_mu %} bugun{% endif %}" data-gun="{{ loop.index0 }}">
                         <span>{{ gun.kisaltma }} {{ gun.ayin_gunu }}</span>
                     </div>
+                    {% endfor %}
+
+                    <!-- Saatsiz sınav şeridi: o hafta saati belirtilmemiş kalem varsa görünür. -->
+                    <div class="serit serit-kose" hidden></div>
+                    {% for gun in gunler %}
+                    <div class="serit serit-hucre" data-gun="{{ loop.index0 }}" hidden></div>
                     {% endfor %}
 
                     <!-- Saat etiketleri -->
@@ -89,6 +103,15 @@
                     <input type="number" name="kredi" data-zorunlu min="0" step="any">
                 </label>
                 <label class="alan">
+                    <span>Hedef harf notu <b class="yildiz">*</b></span>
+                    <select name="hedef_not" data-zorunlu>
+                        <option value="">Seç</option>
+                        {% for harf in hedef_notlari %}
+                        <option value="{{ harf }}">{{ harf }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="alan">
                     <span>AKTS</span>
                     <input type="number" name="akts" min="0" step="any">
                 </label>
@@ -131,22 +154,17 @@
             <details class="bolum" id="degerlendirme-bolumu">
                 <summary>Değerlendirme kalemleri <small>(opsiyonel)</small></summary>
                 <div class="satir degerlendirme-satiri satir-basliklari">
-                    <span>Ad <b class="yildiz">*</b></span>
                     <span>Tür <b class="yildiz">*</b></span>
                     <span>Ağırlık % <b class="yildiz">*</b></span>
                     <span>Tarih</span>
-                    <span>Saat</span>
+                    <span>Başlangıç</span>
+                    <span>Bitiş</span>
                     <span></span>
                 </div>
                 <div id="degerlendirme-listesi"></div>
                 <button type="button" class="satir-ekle" id="degerlendirme-ekle">+ kalem ekle</button>
                 <p class="mesaj" id="agirlik-toplami" hidden></p>
             </details>
-
-            <label class="alan">
-                <span>Notlar</span>
-                <textarea name="notlar" rows="2"></textarea>
-            </label>
 
             <p class="mesaj hata" id="kayit-hatasi" hidden></p>
 
@@ -168,8 +186,19 @@
                 <option value="{{ loop.index0 }}">{{ gun.kisaltma }}</option>
                 {% endfor %}
             </select>
-            <input type="text" data-alan="baslangic" data-zorunlu data-saat placeholder="09:30" maxlength="5" aria-label="Başlangıç saati">
-            <input type="text" data-alan="bitis" data-zorunlu data-saat placeholder="11:00" maxlength="5" aria-label="Bitiş saati">
+            <!-- data-saat: eski kayıttaki tam olmayan saat hangi yöne yuvarlanacak. -->
+            <select data-alan="baslangic" data-zorunlu data-saat="asagi" aria-label="Başlangıç saati">
+                <option value="">—</option>
+                {% for saat in baslangic_saatleri %}
+                <option value="{{ saat }}">{{ saat }}</option>
+                {% endfor %}
+            </select>
+            <select data-alan="bitis" data-zorunlu data-saat="yukari" aria-label="Bitiş saati">
+                <option value="">—</option>
+                {% for saat in bitis_saatleri %}
+                <option value="{{ saat }}">{{ saat }}</option>
+                {% endfor %}
+            </select>
             <input type="text" data-alan="derslik" data-zorunlu placeholder="B201" aria-label="Derslik">
             <select data-alan="tur" aria-label="Tür">
                 <option value="">—</option>
@@ -183,21 +212,32 @@
 
     <template id="degerlendirme-sablonu">
         <div class="satir degerlendirme-satiri">
-            <input type="text" data-alan="ad" data-zorunlu placeholder="Vize 1" aria-label="Ad">
             <select data-alan="tur" data-zorunlu aria-label="Tür">
+                <option value="">Seç</option>
                 {% for tur in degerlendirme_turleri %}
                 <option value="{{ tur.anahtar }}">{{ tur.ad }}</option>
                 {% endfor %}
             </select>
             <input type="number" data-alan="agirlik" data-zorunlu min="0" step="any" placeholder="40" aria-label="Ağırlık yüzdesi">
             <input type="date" data-alan="tarih" aria-label="Tarih">
-            <input type="text" data-alan="saat" data-saat placeholder="13:00" maxlength="5" aria-label="Saat">
+            <select data-alan="saat" data-saat="asagi" aria-label="Başlangıç saati">
+                <option value="">—</option>
+                {% for saat in baslangic_saatleri %}
+                <option value="{{ saat }}">{{ saat }}</option>
+                {% endfor %}
+            </select>
+            <select data-alan="bitis_saat" data-saat="yukari" aria-label="Bitiş saati">
+                <option value="">—</option>
+                {% for saat in bitis_saatleri %}
+                <option value="{{ saat }}">{{ saat }}</option>
+                {% endfor %}
+            </select>
             <button type="button" class="satir-sil" title="Kalemi sil" aria-label="Kalemi sil">×</button>
         </div>
     </template>
 
     <script>
-        // Python'daki ayarlar (renkler, takvimin ilk ve son saati).
+        // Python'daki ayarlar (renkler, takvimin ilk ve son saati, bugünün tarihi, tür listesi).
         const AYARLAR = {{ ayarlar|tojson }};
     </script>
     <script src="{{ url_for('static', filename='uygulama.js') }}"></script>
