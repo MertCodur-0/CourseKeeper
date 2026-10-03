@@ -446,6 +446,11 @@ body {
     color: var(--vurgu);
 }
 
+/* "Dönem" butonu gezinme satırının sağ ucunda durur. */
+.hafta-gezinme .donem-dugmesi {
+    margin-left: auto;
+}
+
 .hafta-yazisi {
     margin-left: 6px;
     font-size: 12px;
@@ -1216,4 +1221,154 @@ body {
 .dugme.tehlikeli {
     border-color: var(--hata);
     color: var(--hata);
+}
+
+/* ============================================================
+   DÖNEM PENCERESİ (akademik takvim ve GPA)
+   Ekranın büyük kısmını kaplar; kenarlarda boşluk kalır.
+   ============================================================ */
+.donem-penceresi {
+    width: 85vw;
+    height: 85vh;
+    max-height: 85vh;
+    padding: 0;                   /* iç boşluğu .donem-icerigi verir */
+}
+
+.donem-icerigi {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 20px 24px;
+}
+
+.donem-icerigi .pencere-baslik {
+    margin-bottom: 8px;
+}
+
+/* Sekmenin içeriği pencerenin kalan yüksekliğini doldurur, uzunsa kendi içinde kayar. */
+.donem-sekmesi {
+    flex: 1;
+    min-height: 0;
+    padding: 16px 2px 2px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.donem-sekmesi .alanlar {
+    max-width: 720px;
+}
+
+.donem-sekmesi .mesaj {
+    margin: 0;
+}
+
+.ders-disi-satiri {
+    grid-template-columns: 140px 1fr 150px 150px 24px;
+    max-width: 720px;
+}
+
+#donem-uyarilari p {
+    margin: 0 0 4px;
+}
+
+#donem-uyarilari p:last-child {
+    margin-bottom: 0;
+}
+
+.donem-ozeti {
+    font-size: 13px;
+    color: var(--baslik-rengi);
+}
+
+/* Kaydet satırı sekmenin altına yapışık kalır. */
+.donem-sekmesi .pencere-dugmeleri {
+    align-items: center;
+    margin-top: auto;
+}
+
+/* ---------- GPA sekmesi ---------- */
+
+.gpa-karti .ana-yazi {
+    font-size: 22px;
+}
+
+.kredi-birimi {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+    margin-top: 12px;
+}
+
+.kredi-birimi label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+}
+
+.ders-formu .kredi-birimi input {
+    width: auto;
+}
+
+.bolum h3 .not-durumu {
+    margin-left: 8px;
+    font-weight: 400;
+}
+
+.gpa-tablosu {
+    max-width: 720px;
+}
+
+.gpa-tablosu th {
+    padding: 0 8px 6px 0;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--soluk-yazi);
+}
+
+.gpa-tablosu td {
+    padding: 6px 8px 6px 0;
+    vertical-align: middle;
+}
+
+.gpa-tablosu .renk-noktasi {
+    display: inline-block;
+    margin: 0 8px 0 0;
+    vertical-align: middle;
+}
+
+.gpa-tablosu select {
+    width: 84px;
+}
+
+/* Hesaba girmeyen dersin küçük sarı uyarısı (AKTS girilmemiş, hedef harf seçilmemiş) */
+.satir-uyarisi {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--uyari-zemin);
+    color: var(--uyari-yazi);
+    font-size: 11px;
+}
+
+/* Simülasyonda harfi değiştirilmiş satırın işareti: küçük nokta */
+.degisti-noktasi {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-left: 6px;
+    border-radius: 50%;
+    background: var(--vurgu);
+    vertical-align: middle;
+}
+
+.simulasyon {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
 }

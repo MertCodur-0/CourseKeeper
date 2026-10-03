@@ -18,6 +18,8 @@
                 <button type="button" id="bugune-don" title="Bu haftaya dön">Bugün</button>
                 <button type="button" id="sonraki-hafta" title="Sonraki hafta" aria-label="Sonraki hafta">›</button>
                 <span class="hafta-yazisi" id="hafta-yazisi"></span>
+                <!-- Dönem ekranını (akademik takvim ve GPA) açar. -->
+                <button type="button" class="donem-dugmesi" id="donem-dugmesi" title="Akademik takvim ve GPA">Dönem</button>
             </nav>
 
             <!-- Haftalık takvim. Hem yatay hem dikey kayan tek alan. -->
@@ -250,6 +252,132 @@
         </form>
     </dialog>
 
+    <!-- ============================================================
+         DÖNEM PENCERESİ: iki sekme, "Akademik takvim" ve "GPA". Takvim ve sağ panel arkada kalır.
+         ============================================================ -->
+    <dialog class="pencere donem-penceresi" id="donem-penceresi">
+        <!-- İçerik pencerenin tamamını kaplar; böylece pencerenin dışına (arka plana) tıklama ayırt edilir. -->
+        <div class="donem-icerigi">
+            <header class="pencere-baslik">
+                <h2>Dönem</h2>
+                <button type="button" class="kapat" id="donem-kapat" aria-label="Kapat">×</button>
+            </header>
+
+            <nav class="sekmeler" id="donem-sekmeleri">
+                <button type="button" data-sekme="takvim">Akademik takvim</button>
+                <button type="button" data-sekme="gpa">GPA</button>
+            </nav>
+
+            <!-- Sekme: Akademik takvim -->
+            <form class="ders-formu donem-sekmesi" id="donem-formu" data-sekme="takvim" novalidate>
+                <div class="alanlar">
+                    <label class="alan genis">
+                        <span>Dönem adı</span>
+                        <input type="text" name="ad" placeholder="2026-2027 Güz" autocomplete="off">
+                    </label>
+                    <span></span>
+                    <label class="alan">
+                        <span>Derslerin ilk günü <b class="yildiz">*</b></span>
+                        <input type="date" name="baslangic" data-zorunlu>
+                    </label>
+                    <label class="alan">
+                        <span>Derslerin son günü <b class="yildiz">*</b> <small>(final hariç)</small></span>
+                        <input type="date" name="bitis" data-zorunlu>
+                    </label>
+                    <span></span>
+                    <label class="alan">
+                        <span>Final dönemi başlangıç</span>
+                        <input type="date" name="final_baslangic">
+                    </label>
+                    <label class="alan">
+                        <span>Final dönemi bitiş</span>
+                        <input type="date" name="final_bitis">
+                    </label>
+                </div>
+
+                <section class="bolum">
+                    <h3>Ders yapılmayan tarihler</h3>
+                    <div class="satir ders-disi-satiri satir-basliklari">
+                        <span>Tür <b class="yildiz">*</b></span>
+                        <span>Ad</span>
+                        <span>Başlangıç <b class="yildiz">*</b></span>
+                        <span>Bitiş <b class="yildiz">*</b></span>
+                        <span></span>
+                    </div>
+                    <div id="ders-disi-listesi"></div>
+                    <button type="button" class="satir-ekle" id="ders-disi-ekle">+ tarih ekle</button>
+                </section>
+
+                <p class="mesaj hata" id="donem-hatasi" hidden></p>
+                <div class="mesaj uyari" id="donem-uyarilari" hidden></div>
+                <p class="mesaj donem-ozeti" id="donem-ozeti" hidden></p>
+
+                <footer class="pencere-dugmeleri">
+                    <button type="button" class="dugme tehlikeli" id="donem-sil" hidden>Dönemi sil</button>
+                    <span class="bosluk"></span>
+                    <span class="not-durumu" id="donem-kayit-durumu"></span>
+                    <button type="submit" class="dugme ana" id="donem-kaydet">Kaydet</button>
+                </footer>
+            </form>
+
+            <!-- Sekme: GPA -->
+            <div class="ders-formu donem-sekmesi" id="gpa-sekmesi" data-sekme="gpa" hidden>
+                <!-- Sonuç kartı (içeriğini JavaScript yazar) -->
+                <div id="gpa-sonucu"></div>
+
+                <section class="bolum">
+                    <h3>Genel durum <span class="not-durumu" id="gpa-kayit-durumu"></span></h3>
+                    <div class="alanlar">
+                        <label class="alan">
+                            <span>Önceki toplam kredi (bu dönem hariç)</span>
+                            <input type="text" inputmode="decimal" id="gpa-onceki-kredi" autocomplete="off" placeholder="60">
+                        </label>
+                        <label class="alan">
+                            <span>Önceki genel GPA</span>
+                            <input type="text" inputmode="decimal" id="gpa-onceki-gpa" autocomplete="off" placeholder="3.00">
+                        </label>
+                        <label class="alan">
+                            <span>Hedef GPA <small>(opsiyonel)</small></span>
+                            <input type="text" inputmode="decimal" id="gpa-hedef" autocomplete="off" placeholder="3.20">
+                        </label>
+                    </div>
+                    <div class="kredi-birimi">
+                        <span>GPA hesabında kullanılacak kredi:</span>
+                        {% for birim in kredi_birimleri %}
+                        <label><input type="radio" name="kredi_birimi" value="{{ birim.anahtar }}"> {{ birim.ad }}</label>
+                        {% endfor %}
+                    </div>
+                    <p class="mesaj hata" id="gpa-hatasi" hidden></p>
+                </section>
+
+                <section class="bolum">
+                    <h3>Bu dönemin dersleri</h3>
+                    <table class="panel-tablosu gpa-tablosu" id="gpa-tablosu"></table>
+                    <p class="mesaj" id="gpa-ders-yok" hidden>Henüz ders eklenmemiş</p>
+                    <div class="simulasyon" id="simulasyon" hidden>
+                        <span id="simulasyon-yazisi"></span>
+                        <button type="button" class="dugme" id="simulasyon-sifirla">Sıfırla</button>
+                        <button type="button" class="dugme" id="simulasyon-kaydet">Bu harfleri hedef olarak kaydet</button>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </dialog>
+
+    <template id="ders-disi-sablonu">
+        <div class="satir ders-disi-satiri">
+            <select data-alan="tur" aria-label="Tür">
+                {% for tur in ders_disi_turleri %}
+                <option value="{{ tur.anahtar }}">{{ tur.ad }}</option>
+                {% endfor %}
+            </select>
+            <input type="text" data-alan="ad" placeholder="Cumhuriyet Bayramı" aria-label="Ad" autocomplete="off">
+            <input type="date" data-alan="baslangic" data-zorunlu aria-label="Başlangıç">
+            <input type="date" data-alan="bitis" data-zorunlu aria-label="Bitiş">
+            <button type="button" class="satir-sil" title="Tarihi sil" aria-label="Tarihi sil">×</button>
+        </div>
+    </template>
+
     <!-- Form satırı şablonları: JavaScript "+ ekle"ye basılınca bunları kopyalar. -->
     <template id="oturum-sablonu">
         <div class="satir oturum-satiri">
@@ -315,5 +443,7 @@
         const AYARLAR = {{ ayarlar|tojson }};
     </script>
     <script src="{{ url_for('static', filename='uygulama.js') }}"></script>
+    <!-- Dönem ekranı (akademik takvim ve GPA); uygulama.js'teki yardımcıları kullanır. -->
+    <script src="{{ url_for('static', filename='donem.js') }}"></script>
 </body>
 </html>

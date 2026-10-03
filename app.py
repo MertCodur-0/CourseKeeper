@@ -102,6 +102,25 @@ HEDEF_NOTLARI = [satir["harf"] for satir in NOT_OLCEGI if satir["katsayi"] > 0]
 # Karşılaştırma tarayıcıda yapılır (uygulama.js: etkinEsik).
 ROUND_MODE = "none"
 
+# GPA ekranda 2 ondalıkla gösterilirken nasıl yuvarlanır? Sadece gösterimde kullanılır;
+# karşılaştırmalar (hedefe ulaşıldı mı?) yuvarlanmamış değerle yapılır.
+#   "round" : en yakın değere (3.045 -> 3.05)
+#   "floor" : aşağı (3.049 -> 3.04)
+GPA_ROUNDING = "round"
+
+# GPA hesabında dersin hangi kredisi kullanılır? (Dönem ekranındaki ayar; varsayılan ilki.)
+KREDI_BIRIMLERI = [
+    {"anahtar": "kredi", "ad": "Kredi"},
+    {"anahtar": "akts", "ad": "AKTS"},
+]
+
+# Dönem içinde ders yapılmayan tarihlerin türleri. Hesapta farkları yok: hepsi "ders yapılmayan gün".
+DERS_DISI_TURLERI = [
+    {"anahtar": "tatil", "ad": "Tatil"},
+    {"anahtar": "sinav", "ad": "Sınav dönemi"},
+    {"anahtar": "diger", "ad": "Diğer"},
+]
+
 OTURUM_TURLERI = [
     {"anahtar": "teori", "ad": "Teori"},
     {"anahtar": "lab", "ad": "Lab"},
@@ -207,7 +226,8 @@ def veritabani_hazirla():
             notlar            TEXT,               -- formda yok; sağ paneldeki "Notlar" sekmesinden yazılır
             hedef_not         TEXT,               -- "AA", "BA" ... (eski derslerde boş olabilir)
             devamsizlik_metni TEXT,               -- formda yok: syllabus'ta yüzde olarak yazmayan devamsızlık kuralı
-            sinav_rengi       TEXT                -- sınav bloklarının rengi (RENKLER anahtarı)
+            sinav_rengi       TEXT,               -- sınav bloklarının rengi (RENKLER anahtarı)
+            gpaya_dahil       INTEGER NOT NULL DEFAULT 1  -- 0: ders GPA hesabına katılmaz
         );
 
         -- Bir dersin haftalık saatleri. Bir dersin birden çok oturumu olabilir.
@@ -233,6 +253,35 @@ def veritabani_hazirla():
             tarih      TEXT,                      -- "2026-11-15"
             saat       TEXT,                      -- başlangıç saati, "13:00"
             bitis_saat TEXT                       -- boşsa süre 1 saat kabul edilir
+        );
+
+        -- Aktif dönem (tek kayıt, id hep 1). Başlangıç/bitiş: derslerin ilk ve son günü (final hariç).
+        CREATE TABLE IF NOT EXISTS donem (
+            id              INTEGER PRIMARY KEY CHECK (id = 1),
+            ad              TEXT,                 -- ör. "2026-2027 Güz"
+            baslangic       TEXT NOT NULL,        -- derslerin ilk günü, "2026-10-05"
+            bitis           TEXT NOT NULL,        -- derslerin son günü
+            final_baslangic TEXT,
+            final_bitis     TEXT
+        );
+
+        -- Dönem içinde ders yapılmayan tarihler (tatil, sınav dönemi...). İleride devamsızlık
+        -- hesabında kullanılacak.
+        CREATE TABLE IF NOT EXISTS ders_disi_tarihler (
+            id        INTEGER PRIMARY KEY,
+            tur       TEXT NOT NULL,              -- DERS_DISI_TURLERI listesindeki anahtar
+            ad        TEXT,
+            baslangic TEXT NOT NULL,
+            bitis     TEXT NOT NULL               -- tek günse başlangıçla aynı
+        );
+
+        -- GPA ayarları (dönemden bağımsız, tek kayıt, id hep 1).
+        CREATE TABLE IF NOT EXISTS gpa_ayarlari (
+            id           INTEGER PRIMARY KEY CHECK (id = 1),
+            onceki_kredi REAL,                    -- bu dönem hariç tamamlanan toplam kredi
+            onceki_gpa   REAL,                    -- bu dönem hariç genel GPA (0-4)
+            hedef_gpa    REAL,
+            kredi_birimi TEXT NOT NULL DEFAULT 'kredi'   -- KREDI_BIRIMLERI listesindeki anahtar
         );
     """)
     silinenler = veritabani_guncelle(baglanti)
@@ -266,6 +315,8 @@ def veritabani_guncelle(baglanti):
     sutun_yoksa_ekle(baglanti, "degerlendirmeler", "ekstra_puan", "INTEGER NOT NULL DEFAULT 0")
     # Mevcut kalemlerde alınan puan boş kalır.
     sutun_yoksa_ekle(baglanti, "degerlendirmeler", "alinan_puan", "REAL")
+    # Mevcut bütün dersler GPA'ya dahil (1) sayılır.
+    sutun_yoksa_ekle(baglanti, "dersler", "gpaya_dahil", "INTEGER NOT NULL DEFAULT 1")
 
     silinenler = []
     # "with baglanti": içindeki işlemler tek seferde kaydedilir, hata olursa hiçbiri kaydedilmez.
@@ -363,6 +414,7 @@ def dersleri_getir(baglanti):
     """Bütün dersleri, oturumları ve değerlendirme kalemleriyle birlikte döndürür."""
     dersler = [dict(satir) for satir in baglanti.execute("SELECT * FROM dersler ORDER BY id")]
     for ders in dersler:
+        ders["gpaya_dahil"] = bool(ders["gpaya_dahil"])
         ders["oturumlar"] = [dict(satir) for satir in baglanti.execute(
             "SELECT id, gun, baslangic, bitis, derslik, tur FROM oturumlar"
             " WHERE ders_id = ? ORDER BY gun, baslangic",
@@ -425,7 +477,7 @@ def alt_satirlari_esitle(baglanti, tablo, sutunlar, ders_id, satirlar):
 def dersi_kaydet(baglanti, ders, ders_id=None):
     """Dersi ekler (ders_id yoksa) veya günceller. Dersin kimliğini döndürür.
 
-    "notlar" sütununa ve kalemlerin "alinan_puan" değerine dokunulmaz (formda yoklar, sağ panelden
+    "notlar" ve "gpaya_dahil" sütunlarına ve kalemlerin "alinan_puan" değerine dokunulmaz (formda yoklar, sağ panelden
     yazılırlar; mevcut değerler aynen kalır).
     "devamsizlik_metni" sadece ders eklenirken yazılır (syllabus'tan gelir), güncellemede aynen kalır.
     """
@@ -785,6 +837,8 @@ def ana_sayfa():
         oturum_turleri=OTURUM_TURLERI,
         degerlendirme_turleri=DEGERLENDIRME_TURLERI,
         en_fazla_agirlik=EN_FAZLA_AGIRLIK,
+        ders_disi_turleri=DERS_DISI_TURLERI,
+        kredi_birimleri=KREDI_BIRIMLERI,
         # JavaScript'in ihtiyaç duyduğu ayarlar (sayfaya JSON olarak yazılır).
         ayarlar={
             "renkler": RENKLER,
@@ -797,6 +851,8 @@ def ana_sayfa():
             "notOlcegi": NOT_OLCEGI,
             "yuzUzerindenTurler": YUZ_UZERINDEN_TURLER,
             "roundMode": ROUND_MODE,
+            "gpaRounding": GPA_ROUNDING,
+            "dersDisiTurleri": DERS_DISI_TURLERI,
         },
     )
 
@@ -894,6 +950,182 @@ def api_puani_kaydet(kalem_id):
         baglanti.execute("UPDATE degerlendirmeler SET alinan_puan = ? WHERE id = ?", (puan, kalem_id))
     baglanti.close()
     return jsonify({"alinan_puan": puan})
+
+
+# ============================================================
+# DÖNEM EKRANI API'si (akademik takvim ve GPA ayarları)
+# ============================================================
+
+def donemi_getir(baglanti):
+    """Aktif dönemi ve ders yapılmayan tarihleri döndürür. Dönem girilmemişse donem None olur."""
+    donem = baglanti.execute(
+        "SELECT ad, baslangic, bitis, final_baslangic, final_bitis FROM donem WHERE id = 1"
+    ).fetchone()
+    tarihler = [dict(satir) for satir in baglanti.execute(
+        "SELECT id, tur, ad, baslangic, bitis FROM ders_disi_tarihler ORDER BY baslangic, id"
+    )]
+    return {"donem": dict(donem) if donem else None, "ders_disi_tarihler": tarihler}
+
+
+def donemi_dogrula(veri):
+    """Akademik takvim formundan gelen veriyi kontrol eder. (temiz_veri, hata_mesaji) döndürür.
+
+    Sadece kaydı engelleyen kurallar burada; sarı uyarılar (finalin derslerden önce olması,
+    dönem dışındaki tarihler) tarayıcıda gösterilir ve kaydı engellemez.
+    """
+    def tarih(deger):
+        yazi = metin(deger)
+        return yazi if yazi and tarih_gecerli_mi(yazi) else None
+
+    baslangic, bitis = tarih(veri.get("baslangic")), tarih(veri.get("bitis"))
+    if baslangic is None or bitis is None:
+        return None, "Derslerin ilk ve son günü zorunlu."
+    # "2026-10-05" < "2026-12-25" karşılaştırması metin olarak da doğru çalışır.
+    if bitis <= baslangic:
+        return None, "Derslerin son günü ilk günden sonra olmalı."
+    final_baslangic, final_bitis = tarih(veri.get("final_baslangic")), tarih(veri.get("final_bitis"))
+    if final_bitis is not None and (final_baslangic is None or final_bitis <= final_baslangic):
+        return None, "Final dönemi bitişi başlangıcından sonra olmalı."
+
+    turler = [tur["anahtar"] for tur in DERS_DISI_TURLERI]
+    tarihler = []
+    for satir in veri.get("ders_disi_tarihler") or []:
+        satir_baslangic, satir_bitis = tarih(satir.get("baslangic")), tarih(satir.get("bitis"))
+        if satir.get("tur") not in turler or satir_baslangic is None or satir_bitis is None:
+            return None, "Ders yapılmayan tarihlerde tür, başlangıç ve bitiş zorunlu."
+        if satir_bitis < satir_baslangic:
+            return None, "Ders yapılmayan tarihin bitişi başlangıcından önce olamaz."
+        tarihler.append({"tur": satir["tur"], "ad": metin(satir.get("ad")) or None,
+                         "baslangic": satir_baslangic, "bitis": satir_bitis})
+    donem = {"ad": metin(veri.get("ad")) or None, "baslangic": baslangic, "bitis": bitis,
+             "final_baslangic": final_baslangic, "final_bitis": final_bitis}
+    return {"donem": donem, "ders_disi_tarihler": tarihler}, None
+
+
+@app.route("/api/donem", methods=["GET"])
+def api_donemi_getir():
+    baglanti = veritabani_baglan()
+    sonuc = donemi_getir(baglanti)
+    baglanti.close()
+    return jsonify(sonuc)
+
+
+@app.route("/api/donem", methods=["PUT"])
+def api_donemi_kaydet():
+    """Dönemi ve ders yapılmayan tarihler listesini formdaki haliyle kaydeder."""
+    veri, hata = donemi_dogrula(request.get_json(silent=True) or {})
+    if hata:
+        return jsonify({"hata": hata}), 400
+    donem = veri["donem"]
+    baglanti = veritabani_baglan()
+    with baglanti:
+        baglanti.execute(
+            "INSERT OR REPLACE INTO donem (id, ad, baslangic, bitis, final_baslangic, final_bitis)"
+            " VALUES (1, ?, ?, ?, ?, ?)",
+            (donem["ad"], donem["baslangic"], donem["bitis"], donem["final_baslangic"], donem["final_bitis"]),
+        )
+        baglanti.execute("DELETE FROM ders_disi_tarihler")
+        for satir in veri["ders_disi_tarihler"]:
+            baglanti.execute(
+                "INSERT INTO ders_disi_tarihler (tur, ad, baslangic, bitis) VALUES (?, ?, ?, ?)",
+                (satir["tur"], satir["ad"], satir["baslangic"], satir["bitis"]),
+            )
+    sonuc = donemi_getir(baglanti)
+    baglanti.close()
+    return jsonify(sonuc)
+
+
+@app.route("/api/donem", methods=["DELETE"])
+def api_donemi_sil():
+    """Dönemi ve ders yapılmayan tarihleri siler. Derslere ve GPA ayarlarına dokunmaz."""
+    baglanti = veritabani_baglan()
+    with baglanti:
+        baglanti.execute("DELETE FROM donem")
+        baglanti.execute("DELETE FROM ders_disi_tarihler")
+    baglanti.close()
+    return jsonify({"silindi": True})
+
+
+def gpa_ayarlarini_getir(baglanti):
+    satir = baglanti.execute(
+        "SELECT onceki_kredi, onceki_gpa, hedef_gpa, kredi_birimi FROM gpa_ayarlari WHERE id = 1"
+    ).fetchone()
+    if satir:
+        return dict(satir)
+    return {"onceki_kredi": None, "onceki_gpa": None, "hedef_gpa": None,
+            "kredi_birimi": KREDI_BIRIMLERI[0]["anahtar"]}
+
+
+@app.route("/api/gpa", methods=["GET"])
+def api_gpa_ayarlarini_getir():
+    baglanti = veritabani_baglan()
+    sonuc = gpa_ayarlarini_getir(baglanti)
+    baglanti.close()
+    return jsonify(sonuc)
+
+
+@app.route("/api/gpa", methods=["PUT"])
+def api_gpa_ayarlarini_kaydet():
+    """GPA ayarlarını kaydeder: önceki kredi (>= 0), önceki GPA ve hedef GPA (0-4), kredi birimi."""
+    veri = request.get_json(silent=True) or {}
+    try:
+        onceki_kredi = sayiya_cevir(veri.get("onceki_kredi"))
+        onceki_gpa = sayiya_cevir(veri.get("onceki_gpa"))
+        hedef_gpa = sayiya_cevir(veri.get("hedef_gpa"))
+    except ValueError:
+        return jsonify({"hata": "Kredi ve GPA sayı olmalı."}), 400
+    if onceki_kredi is not None and onceki_kredi < 0:
+        return jsonify({"hata": "Önceki toplam kredi 0 veya daha büyük olmalı."}), 400
+    if any(gpa is not None and not 0 <= gpa <= 4 for gpa in (onceki_gpa, hedef_gpa)):
+        return jsonify({"hata": "GPA 0 ile 4 arasında olmalı."}), 400
+    kredi_birimi = veri.get("kredi_birimi")
+    if kredi_birimi not in [birim["anahtar"] for birim in KREDI_BIRIMLERI]:
+        return jsonify({"hata": "Geçersiz kredi birimi."}), 400
+    baglanti = veritabani_baglan()
+    with baglanti:
+        baglanti.execute(
+            "INSERT OR REPLACE INTO gpa_ayarlari (id, onceki_kredi, onceki_gpa, hedef_gpa, kredi_birimi)"
+            " VALUES (1, ?, ?, ?, ?)",
+            (onceki_kredi, onceki_gpa, hedef_gpa, kredi_birimi),
+        )
+    sonuc = gpa_ayarlarini_getir(baglanti)
+    baglanti.close()
+    return jsonify(sonuc)
+
+
+@app.route("/api/dersler/<int:ders_id>/gpa", methods=["PUT"])
+def api_gpaya_dahili_kaydet(ders_id):
+    """Dersin GPA hesabına katılıp katılmayacağını kaydeder."""
+    veri = request.get_json(silent=True) or {}
+    dahil = 1 if veri.get("gpaya_dahil") is True else 0
+    baglanti = veritabani_baglan()
+    with baglanti:
+        imlec = baglanti.execute("UPDATE dersler SET gpaya_dahil = ? WHERE id = ?", (dahil, ders_id))
+    baglanti.close()
+    if imlec.rowcount == 0:
+        return jsonify({"hata": "Ders bulunamadı."}), 404
+    return jsonify({"gpaya_dahil": bool(dahil)})
+
+
+@app.route("/api/hedef-notlari", methods=["PUT"])
+def api_hedef_notlarini_kaydet():
+    """Birkaç dersin hedef harf notunu birlikte kaydeder (GPA simülasyonundaki harfler)."""
+    veri = request.get_json(silent=True) or {}
+    hedefler = veri.get("hedefler")
+    if not isinstance(hedefler, list) or not hedefler:
+        return jsonify({"hata": "Kaydedilecek hedef yok."}), 400
+    for hedef in hedefler:
+        if (not isinstance(hedef, dict) or not isinstance(hedef.get("id"), int)
+                or hedef.get("hedef_not") not in HEDEF_NOTLARI):
+            return jsonify({"hata": "Geçersiz hedef harf notu."}), 400
+    baglanti = veritabani_baglan()
+    with baglanti:
+        for hedef in hedefler:
+            baglanti.execute(
+                "UPDATE dersler SET hedef_not = ? WHERE id = ?", (hedef["hedef_not"], hedef["id"])
+            )
+    baglanti.close()
+    return jsonify({"kaydedildi": True})
 
 
 # ============================================================
