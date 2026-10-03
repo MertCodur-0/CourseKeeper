@@ -17,3 +17,4 @@ Kişisel akademik takip uygulaması. Mac'te yerelde çalışır.
   - Oturum türleri: teori, lab. "Notlar" alanı yok: sağlayıcıdan not istenmez, devamsızlık ham metni gibi bilgiler dersin gizli bir alanında durur.
   - Değerlendirme kalemleri app.py'deki sabit tür listesiyle eşleştirilir (Vize 1/2/3, Final, Quiz, Ödev, Proje, Lab, Diğer 1/2/3), her tür derste en fazla bir kez. Sığmayanlar boş "Diğer" yerlerine, yine sığmayanlar onay ekranında "Sığmayan kalemler" uyarısına.
   - Okunan sınav/kalem tarih ve saatleri forma işlenir; takvimde diğer sınavlar gibi görünür.
+- Değerlendirme toplamı %100'ü aşabilir (ekstra puan). Ekstra işaretli kalemler ayrı tutulur. Ders puanı 100'e KIRPILMAZ: ekstra puanlar doğrudan toplama eklenir (örn. 103 puan 103 olarak hesaplanır). Bir dersin alabileceği en yüksek puan = normal kalemlerin toplamı + ekstra kalemlerin toplamı. Not hesabında (hedef harf notu için gereken puan, ortalama vb.) bu kural kullanılır.
