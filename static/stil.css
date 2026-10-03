@@ -1,0 +1,195 @@
+/* ============================================================
+   RENKLER ve ÖLÇÜLER — hepsi burada, tek yerde tanımlı.
+   Tema değiştirmek için sadece bu bloğu düzenlemek yeterli.
+   ============================================================ */
+:root {
+    /* Renkler */
+    --arka-plan: #f6f7f9;         /* sayfanın arka planı */
+    --yuzey: #ffffff;             /* takvimin zemini */
+    --panel-arka-plan: #fbfbfd;   /* sağ panelin zemini */
+    --cerceve: #e3e6eb;           /* takvim ve panel çerçevesi */
+    --cizgi: #e9ecf0;             /* saat (yatay) çizgileri */
+    --ayrac: #f1f3f6;             /* gün (dikey) ayraçları */
+    --baslik-rengi: #1f2f56;      /* gün başlıkları (koyu lacivert) */
+    --soluk-yazi: #8a93a3;        /* saat etiketleri, tarih */
+    --vurgu: #3b5bdb;             /* bugünün vurgusu */
+    --vurgu-zemin: #eef2ff;       /* bugünün başlık zemini */
+    --kaydirma-cubugu: #d3d8e0;
+
+    /* Sabit ölçüler */
+    --saat-sutunu: 52px;          /* soldaki saat etiketi sütununun genişliği */
+    --baslik-yuksekligi: 40px;    /* üstteki gün başlığı satırının yüksekliği */
+    --gorunen-gun: 5;             /* ilk açılışta görünen gün sayısı (Pzt-Cum) */
+    --gorunen-saat: 10;           /* ilk açılışta görünen satır sayısı (09 ... 18 etiketleri) */
+    --en-az-sutun: 110px;         /* çok küçük pencerede en az sütun genişliği */
+    --en-az-satir: 48px;          /* çok küçük pencerede en az satır yüksekliği */
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    background: var(--arka-plan);
+    color: var(--baslik-rengi);
+}
+
+/* ============================================================
+   SAYFA DÜZENİ: solda takvim (%75), sağda panel (%25)
+   ============================================================ */
+.sayfa {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    gap: 16px;
+    height: 100vh;
+    padding: 16px;
+}
+
+.yan-panel {
+    background: var(--panel-arka-plan);
+    border: 1px solid var(--cerceve);
+    border-radius: 12px;
+}
+
+/* ============================================================
+   TAKVİM: tek kaydırma alanı (hem yatay hem dikey)
+   ============================================================ */
+.takvim {
+    min-width: 0;                 /* dar pencerede sağ paneli itmesin */
+    overflow: auto;
+    background: var(--yuzey);
+    border: 1px solid var(--cerceve);
+    border-radius: 12px;
+
+    /* Bu satır sayesinde içerideki "cqw" ve "cqh" birimleri takvimin
+       GÖRÜNEN genişliğinin ve yüksekliğinin yüzdesi anlamına gelir. */
+    container-type: size;
+
+    /* Sade kaydırma çubukları */
+    scrollbar-width: thin;
+    scrollbar-color: var(--kaydirma-cubugu) transparent;
+}
+
+.izgara {
+    /* ------------------------------------------------------------
+       IZGARANIN İKİ TEMEL ÖLÇÜSÜ — sadece burada hesaplanır.
+
+       Sütun genişliği = (görünen genişlik - saat sütunu) / 5
+       Satır yüksekliği = (görünen yükseklik - başlık satırı) / 10
+
+       Pencere boyutu değişince tarayıcı bunları kendisi yeniden hesaplar,
+       böylece hep 5 gün ve 10 saat satırı (09 ... 18) görünür.
+
+       İleride ders blokları da bu değişkenlerle konumlanacak. Örnek:
+       09:30'da başlayıp 11:00'de biten ders (gün sütununun içinde):
+           top:    calc(var(--satir-yuksekligi) * (9.5 - var(--ilk-saat)));
+           height: calc(var(--satir-yuksekligi) * 1.5);
+       ------------------------------------------------------------ */
+    --sutun-genisligi: max(
+        var(--en-az-sutun),
+        calc((100cqw - var(--saat-sutunu)) / var(--gorunen-gun))
+    );
+    --satir-yuksekligi: max(
+        var(--en-az-satir),
+        calc((100cqh - var(--baslik-yuksekligi)) / var(--gorunen-saat))
+    );
+
+    display: grid;
+    grid-template-columns: var(--saat-sutunu) repeat(7, var(--sutun-genisligi));
+    grid-template-rows: var(--baslik-yuksekligi) auto;
+    width: max-content;
+}
+
+/* ---------- Sabit kalan parçalar: köşe, gün başlıkları, saat etiketleri ---------- */
+
+.kose,
+.gun-baslik,
+.saat-etiketleri {
+    position: sticky;
+    background: var(--yuzey);
+}
+
+/* Sol üst köşe: iki yönde de sabit, içinde bugünün tarihi yazar. */
+.kose {
+    top: 0;
+    left: 0;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--soluk-yazi);
+    border-bottom: 1px solid var(--cizgi);
+}
+
+/* Gün başlıkları: dikey kaydırmada üstte sabit. */
+.gun-baslik {
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--baslik-rengi);
+    border-bottom: 1px solid var(--cizgi);
+    border-left: 1px solid var(--ayrac);
+}
+
+/* Bugünün başlığı hafifçe vurgulanır. */
+.gun-baslik.bugun span {
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--vurgu-zemin);
+    color: var(--vurgu);
+}
+
+/* Saat etiketleri: yatay kaydırmada solda sabit. */
+.saat-etiketleri {
+    left: 0;
+    z-index: 1;
+}
+
+.saat-etiketi {
+    height: var(--satir-yuksekligi);
+    padding: 6px 10px 0 0;
+    text-align: right;
+    font-size: 11px;
+    color: var(--soluk-yazi);
+}
+
+/* ---------- Gün sütunları ---------- */
+
+/* Her gün sütunu bir konumlandırma alanıdır (position: relative).
+   Saat çizgileri sadece arka plan resmidir; ders blokları ileride
+   bunun üstüne "position: absolute" ile yerleştirilecek. */
+.gun-sutunu {
+    position: relative;
+    height: calc(var(--satir-yuksekligi) * var(--satir-sayisi));
+    border-left: 1px solid var(--ayrac);
+    background-image: linear-gradient(to top, var(--cizgi) 1px, transparent 1px);
+    background-size: 100% var(--satir-yuksekligi);
+}
+
+/* ---------- Kaydırma çubukları (Safari ve Chrome) ---------- */
+
+.takvim::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.takvim::-webkit-scrollbar-thumb {
+    background: var(--kaydirma-cubugu);
+    border-radius: 4px;
+}
+
+.takvim::-webkit-scrollbar-track,
+.takvim::-webkit-scrollbar-corner {
+    background: transparent;
+}

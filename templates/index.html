@@ -4,9 +4,50 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>DersTakip</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='stil.css') }}">
 </head>
 <body>
-    <h1>DersTakip</h1>
-    <p>Uygulama çalışıyor. Özellikler adım adım buraya eklenecek.</p>
+    <main class="sayfa">
+
+        <!-- SOL: haftalık takvim. Hem yatay hem dikey kayan tek alan. -->
+        <section class="takvim" id="takvim">
+            <!-- Satır sayısı ve ilk saat Python'dan gelir, CSS bunları hesaplarda kullanır. -->
+            <div class="izgara" style="--satir-sayisi: {{ saatler|length }}; --ilk-saat: {{ ilk_saat }};">
+
+                <!-- Sol üst köşe: bugünün tarihi -->
+                <div class="kose">{{ bugun_yazisi }}</div>
+
+                <!-- Gün başlıkları -->
+                {% for gun in gunler %}
+                <div class="gun-baslik{% if gun.bugun_mu %} bugun{% endif %}">
+                    <span>{{ gun.kisaltma }} {{ gun.ayin_gunu }}</span>
+                </div>
+                {% endfor %}
+
+                <!-- Saat etiketleri -->
+                <div class="saat-etiketleri">
+                    {% for saat in saatler %}
+                    <div class="saat-etiketi">{{ "%02d"|format(saat) }}</div>
+                    {% endfor %}
+                </div>
+
+                <!-- Gün sütunları: ders blokları ileride bunların içine konumlandırılacak. -->
+                {% for gun in gunler %}
+                <div class="gun-sutunu{% if gun.bugun_mu %} bugun{% endif %}" data-gun="{{ loop.index0 }}"></div>
+                {% endfor %}
+
+            </div>
+        </section>
+
+        <!-- SAĞ: şimdilik boş panel (ileride sekmeli panel olacak). -->
+        <aside class="yan-panel"></aside>
+
+    </main>
+
+    <script>
+        // Sayfa yenilenince tarayıcı eski kaydırma konumunu hatırlamasın:
+        // her açılışta sol üstten (Pazartesi, 09:00) başla.
+        document.getElementById("takvim").scrollTo(0, 0);
+    </script>
 </body>
 </html>
