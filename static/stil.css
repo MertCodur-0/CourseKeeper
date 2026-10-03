@@ -15,6 +15,9 @@
     --vurgu: #3b5bdb;             /* bugünün vurgusu */
     --vurgu-zemin: #eef2ff;       /* bugünün başlık zemini */
     --kaydirma-cubugu: #d3d8e0;
+    --hata: #e03131;              /* eksik alan çerçevesi, hata yazısı, Sil butonu */
+    --uyari-yazi: #8a6100;        /* sarı uyarı yazısı */
+    --uyari-zemin: #fff4cc;       /* sarı uyarı zemini */
 
     /* Sabit ölçüler */
     --saat-sutunu: 52px;          /* soldaki saat etiketi sütununun genişliği */
@@ -60,8 +63,15 @@ body {
 /* ============================================================
    TAKVİM: tek kaydırma alanı (hem yatay hem dikey)
    ============================================================ */
-.takvim {
+/* Takvim alanı: içinde kayan takvim ve kaymayan "+" butonu durur. */
+.takvim-alani {
+    position: relative;
     min-width: 0;                 /* dar pencerede sağ paneli itmesin */
+}
+
+.takvim {
+    position: absolute;           /* takvim alanının tamamını kapla */
+    inset: 0;
     overflow: auto;
     background: var(--yuzey);
     border: 1px solid var(--cerceve);
@@ -86,10 +96,7 @@ body {
        Pencere boyutu değişince tarayıcı bunları kendisi yeniden hesaplar,
        böylece hep 5 gün ve 10 saat satırı (09 ... 18) görünür.
 
-       İleride ders blokları da bu değişkenlerle konumlanacak. Örnek:
-       09:30'da başlayıp 11:00'de biten ders (gün sütununun içinde):
-           top:    calc(var(--satir-yuksekligi) * (9.5 - var(--ilk-saat)));
-           height: calc(var(--satir-yuksekligi) * 1.5);
+       Ders blokları da bu değişkenlerle konumlanır (aşağıda ".ders-blogu").
        ------------------------------------------------------------ */
     --sutun-genisligi: max(
         var(--en-az-sutun),
@@ -167,8 +174,8 @@ body {
 /* ---------- Gün sütunları ---------- */
 
 /* Her gün sütunu bir konumlandırma alanıdır (position: relative).
-   Saat çizgileri sadece arka plan resmidir; ders blokları ileride
-   bunun üstüne "position: absolute" ile yerleştirilecek. */
+   Saat çizgileri sadece arka plan resmidir; ders blokları bunun
+   üstüne "position: absolute" ile yerleşir. */
 .gun-sutunu {
     position: relative;
     height: calc(var(--satir-yuksekligi) * var(--satir-sayisi));
@@ -192,4 +199,406 @@ body {
 .takvim::-webkit-scrollbar-track,
 .takvim::-webkit-scrollbar-corner {
     background: transparent;
+}
+
+/* ============================================================
+   DERS BLOKLARI
+   JavaScript her bloğa dört değer verir:
+     --baslangic    : başlangıç saati (09:30 için 9.5)
+     --sure         : kaç saat sürdüğü (09:30-11:00 için 1.5)
+     --sutun        : çakışmada yan yana kaçıncı sırada olduğu (0'dan başlar)
+     --sutun-sayisi : çakışan oturumların kaça bölündüğü (çakışma yoksa 1)
+   Konum ve boyut bunlardan ve ızgara ölçülerinden burada hesaplanır.
+   ============================================================ */
+/* Blok: oturumun ızgaradaki TAM yeri (saat çizgisinden saat çizgisine, sütunun
+   tam payı). Kendisi görünmez; iç kenar payı sayesinde içindeki renkli kutu
+   sütun çizgilerine ve komşu bloklara yapışmaz. */
+.ders-blogu {
+    position: absolute;
+    top: calc(var(--satir-yuksekligi) * (var(--baslangic) - var(--ilk-saat)));
+    height: calc(var(--satir-yuksekligi) * var(--sure));
+    left: calc(100% * var(--sutun) / var(--sutun-sayisi));
+    width: calc(100% / var(--sutun-sayisi));
+
+    padding: 2px 4px;             /* görsel boşluk: üst-alt 2px, sağ-sol 4px */
+    border: 0;
+    background: none;
+    font: inherit;
+    cursor: pointer;
+}
+
+/* Kutu: bloğun görünen kısmı. Rengi ve yazı rengi JavaScript'ten gelir. */
+.blok-kutu {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;             /* yazı hiçbir zaman kutunun dışına taşmaz */
+    border-radius: 14px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+/* Üzerine gelince blok çok hafif yükselir. */
+.ders-blogu:hover .blok-kutu {
+    transform: translateY(-1px);
+    box-shadow: 0 7px 16px rgba(0, 0, 0, 0.26);
+}
+
+/* İçerik: üstte ders kodu, altta derslik; ikisi de ortalı.
+   --blok-bosluk ve --blok-punto, yazı sığmazsa JavaScript tarafından küçültülür. */
+.blok-icerik {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    gap: var(--blok-bosluk, 12px);
+    font-size: var(--blok-punto, 12.5px);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+}
+
+.blok-kod {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* ============================================================
+   "+" BUTONU: takvim alanının sol altında sabit durur
+   ============================================================ */
+.ekle-dugmesi {
+    position: absolute;
+    left: 8px;
+    bottom: 16px;
+    z-index: 5;
+    width: 36px;
+    height: 36px;
+    padding: 0 0 2px;
+    border: 0;
+    border-radius: 9px;
+    background: var(--baslik-rengi);
+    color: #ffffff;
+    font: inherit;
+    font-size: 22px;
+    line-height: 1;
+    box-shadow: 0 2px 8px rgba(31, 47, 86, 0.3);
+    cursor: pointer;
+}
+
+.ekle-dugmesi:hover {
+    background: var(--vurgu);
+}
+
+/* ============================================================
+   DERS PENCERESİ ve FORM
+   ============================================================ */
+
+/* "hidden" verilen parça, aşağıdaki display kurallarına rağmen gizli kalsın. */
+[hidden] {
+    display: none !important;
+}
+
+.pencere {
+    width: min(700px, 94vw);
+    max-height: 92vh;
+    padding: 20px 24px;
+    border: 1px solid var(--cerceve);
+    border-radius: 14px;
+    background: var(--yuzey);
+    color: var(--baslik-rengi);
+    box-shadow: 0 20px 60px rgba(31, 47, 86, 0.25);
+}
+
+.pencere::backdrop {
+    background: rgba(31, 47, 86, 0.25);
+}
+
+.pencere-baslik {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.pencere-baslik h2 {
+    margin: 0;
+    font-size: 17px;
+}
+
+.kapat,
+.satir-sil {
+    border: 0;
+    background: none;
+    color: var(--soluk-yazi);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.kapat:hover,
+.satir-sil:hover {
+    color: var(--hata);
+}
+
+.satir-sil:disabled {
+    visibility: hidden;
+}
+
+/* ---------- Seçim ekranı: "Syllabus ile ekle" / "Elle ekle" ---------- */
+
+.secim-ekrani {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.secenek {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 28px 16px 22px;
+    border: 1px solid var(--cerceve);
+    border-radius: 12px;
+    background: var(--yuzey);
+    color: var(--baslik-rengi);
+    font: inherit;
+    cursor: pointer;
+}
+
+.secenek small {
+    color: var(--soluk-yazi);
+}
+
+.secenek:hover:not(:disabled) {
+    border-color: var(--vurgu);
+    background: var(--vurgu-zemin);
+}
+
+.secenek:disabled {
+    cursor: default;
+    opacity: 0.55;
+}
+
+.rozet {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--uyari-zemin);
+    color: var(--uyari-yazi);
+    font-size: 11px;
+}
+
+/* ---------- Form ---------- */
+
+.ders-formu {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    font-size: 13px;
+}
+
+.alanlar {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.alan {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.alan.genis {
+    grid-column: span 2;
+}
+
+.alan > span,
+.satir-basliklari {
+    font-size: 12px;
+    color: var(--soluk-yazi);
+}
+
+.yildiz {
+    color: var(--hata);
+}
+
+.ders-formu input,
+.ders-formu select,
+.ders-formu textarea {
+    width: 100%;
+    min-width: 0;
+    padding: 6px 8px;
+    border: 1px solid var(--cerceve);
+    border-radius: 7px;
+    background: var(--yuzey);
+    color: inherit;
+    font: inherit;
+}
+
+.ders-formu input:focus,
+.ders-formu select:focus,
+.ders-formu textarea:focus {
+    outline: 2px solid var(--vurgu-zemin);
+    border-color: var(--vurgu);
+}
+
+/* Eksik veya hatalı zorunlu alan: kırmızı çerçeve */
+.ders-formu .eksik {
+    border-color: var(--hata);
+}
+
+.ders-formu textarea {
+    resize: vertical;
+}
+
+/* ---------- Renk seçici ---------- */
+
+.renk-secici {
+    display: flex;
+    gap: 8px;
+}
+
+.renk-secenegi input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+}
+
+.renk-secenegi span {
+    display: block;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    background: var(--renk);
+    cursor: pointer;
+}
+
+/* Seçili renk: etrafında halka */
+.renk-secenegi input:checked + span {
+    box-shadow: 0 0 0 2px var(--yuzey), 0 0 0 4px var(--baslik-rengi);
+}
+
+.renk-secenegi input:focus-visible + span {
+    box-shadow: 0 0 0 2px var(--yuzey), 0 0 0 4px var(--vurgu);
+}
+
+/* ---------- Oturum ve değerlendirme satırları ---------- */
+
+.bolum {
+    padding-top: 14px;
+    border-top: 1px solid var(--cizgi);
+}
+
+.bolum h3,
+.bolum summary {
+    margin: 0 0 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.bolum summary {
+    cursor: pointer;
+}
+
+.bolum summary small {
+    font-weight: 400;
+    color: var(--soluk-yazi);
+}
+
+.satir {
+    display: grid;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.oturum-satiri {
+    grid-template-columns: 84px 76px 76px 1fr 104px 24px;
+}
+
+.degerlendirme-satiri {
+    grid-template-columns: 1fr 88px 84px 140px 68px 24px;
+}
+
+.satir-basliklari {
+    margin-bottom: 4px;
+}
+
+.satir-ekle {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--vurgu);
+    font: inherit;
+    cursor: pointer;
+}
+
+.satir-ekle:hover {
+    text-decoration: underline;
+}
+
+/* ---------- Mesajlar ---------- */
+
+.mesaj {
+    margin: 10px 0 0;
+    font-size: 12px;
+    color: var(--soluk-yazi);
+}
+
+.mesaj.hata {
+    color: var(--hata);
+}
+
+.mesaj.uyari {
+    padding: 6px 10px;
+    border-radius: 7px;
+    background: var(--uyari-zemin);
+    color: var(--uyari-yazi);
+}
+
+/* ---------- Alt butonlar ---------- */
+
+.pencere-dugmeleri {
+    display: flex;
+    gap: 8px;
+    padding-top: 14px;
+    border-top: 1px solid var(--cizgi);
+}
+
+.bosluk {
+    flex: 1;
+}
+
+.dugme {
+    padding: 7px 16px;
+    border: 1px solid var(--cerceve);
+    border-radius: 8px;
+    background: var(--yuzey);
+    color: var(--baslik-rengi);
+    font: inherit;
+    cursor: pointer;
+}
+
+.dugme.ana {
+    border-color: var(--vurgu);
+    background: var(--vurgu);
+    color: #ffffff;
+}
+
+.dugme.ana:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.dugme.tehlikeli {
+    border-color: var(--hata);
+    color: var(--hata);
 }

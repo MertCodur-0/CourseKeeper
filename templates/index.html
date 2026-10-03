@@ -9,45 +9,197 @@
 <body>
     <main class="sayfa">
 
-        <!-- SOL: haftalık takvim. Hem yatay hem dikey kayan tek alan. -->
-        <section class="takvim" id="takvim">
-            <!-- Satır sayısı ve ilk saat Python'dan gelir, CSS bunları hesaplarda kullanır. -->
-            <div class="izgara" style="--satir-sayisi: {{ saatler|length }}; --ilk-saat: {{ ilk_saat }};">
+        <!-- SOL: takvim alanı. İçinde kayan takvim ve sabit duran "+" butonu var. -->
+        <div class="takvim-alani">
 
-                <!-- Sol üst köşe: bugünün tarihi -->
-                <div class="kose">{{ bugun_yazisi }}</div>
+            <!-- Haftalık takvim. Hem yatay hem dikey kayan tek alan. -->
+            <section class="takvim" id="takvim">
+                <!-- Satır sayısı ve ilk saat Python'dan gelir, CSS bunları hesaplarda kullanır. -->
+                <div class="izgara" id="izgara" style="--satir-sayisi: {{ saatler|length }}; --ilk-saat: {{ ilk_saat }};">
 
-                <!-- Gün başlıkları -->
-                {% for gun in gunler %}
-                <div class="gun-baslik{% if gun.bugun_mu %} bugun{% endif %}">
-                    <span>{{ gun.kisaltma }} {{ gun.ayin_gunu }}</span>
-                </div>
-                {% endfor %}
+                    <!-- Sol üst köşe: bugünün tarihi -->
+                    <div class="kose">{{ bugun_yazisi }}</div>
 
-                <!-- Saat etiketleri -->
-                <div class="saat-etiketleri">
-                    {% for saat in saatler %}
-                    <div class="saat-etiketi">{{ "%02d"|format(saat) }}</div>
+                    <!-- Gün başlıkları -->
+                    {% for gun in gunler %}
+                    <div class="gun-baslik{% if gun.bugun_mu %} bugun{% endif %}">
+                        <span>{{ gun.kisaltma }} {{ gun.ayin_gunu }}</span>
+                    </div>
                     {% endfor %}
+
+                    <!-- Saat etiketleri -->
+                    <div class="saat-etiketleri">
+                        {% for saat in saatler %}
+                        <div class="saat-etiketi">{{ "%02d"|format(saat) }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Gün sütunları: ders bloklarını JavaScript bunların içine yerleştirir. -->
+                    {% for gun in gunler %}
+                    <div class="gun-sutunu{% if gun.bugun_mu %} bugun{% endif %}" data-gun="{{ loop.index0 }}"></div>
+                    {% endfor %}
+
                 </div>
+            </section>
 
-                <!-- Gün sütunları: ders blokları ileride bunların içine konumlandırılacak. -->
-                {% for gun in gunler %}
-                <div class="gun-sutunu{% if gun.bugun_mu %} bugun{% endif %}" data-gun="{{ loop.index0 }}"></div>
-                {% endfor %}
-
-            </div>
-        </section>
+            <button type="button" class="ekle-dugmesi" id="ekle-dugmesi" title="Ders ekle" aria-label="Ders ekle">+</button>
+        </div>
 
         <!-- SAĞ: şimdilik boş panel (ileride sekmeli panel olacak). -->
         <aside class="yan-panel"></aside>
 
     </main>
 
+    <!-- ============================================================
+         DERS PENCERESİ: önce seçim ekranı, sonra ders formu gösterilir.
+         ============================================================ -->
+    <dialog class="pencere" id="ders-penceresi">
+        <header class="pencere-baslik">
+            <h2 id="pencere-basligi">Ders ekle</h2>
+            <button type="button" class="kapat" id="pencere-kapat" aria-label="Kapat">×</button>
+        </header>
+
+        <!-- 1) Nasıl ekleneceğini seçme ekranı -->
+        <div class="secim-ekrani" id="secim-ekrani">
+            <button type="button" class="secenek" disabled>
+                <span class="rozet">yakında</span>
+                <strong>Syllabus ile ekle</strong>
+                <small>Ders izlencesinden otomatik doldur</small>
+            </button>
+            <button type="button" class="secenek" id="elle-ekle">
+                <strong>Elle ekle</strong>
+                <small>Bilgileri kendin gir</small>
+            </button>
+        </div>
+
+        <!-- 2) Ders formu. Hem yeni ders hem düzenleme için aynı form kullanılır. -->
+        <form class="ders-formu" id="ders-formu" novalidate hidden>
+
+            <div class="alanlar">
+                <label class="alan">
+                    <span>Ders kodu <b class="yildiz">*</b></span>
+                    <input type="text" name="kod" data-zorunlu placeholder="CMPE 114_01" autocomplete="off">
+                </label>
+                <label class="alan genis">
+                    <span>Ders adı</span>
+                    <input type="text" name="ad" placeholder="Programlamaya Giriş" autocomplete="off">
+                </label>
+                <label class="alan">
+                    <span>Kredi <b class="yildiz">*</b></span>
+                    <input type="number" name="kredi" data-zorunlu min="0" step="any">
+                </label>
+                <label class="alan">
+                    <span>AKTS</span>
+                    <input type="number" name="akts" min="0" step="any">
+                </label>
+                <label class="alan">
+                    <span>Devamsızlık hakkı (%)</span>
+                    <input type="number" name="devamsizlik_hakki" min="0" step="any" placeholder="30">
+                </label>
+            </div>
+
+            <div class="alan">
+                <span>Renk</span>
+                <div class="renk-secici">
+                    {% for renk in renkler %}
+                    <label class="renk-secenegi" title="{{ renk.ad }}" style="--renk: {{ renk.kod }};">
+                        <input type="radio" name="renk" value="{{ renk.anahtar }}">
+                        <span></span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Oturumlar -->
+            <section class="bolum">
+                <h3>Oturumlar <b class="yildiz">*</b></h3>
+                <div class="satir oturum-satiri satir-basliklari">
+                    <span>Gün <b class="yildiz">*</b></span>
+                    <span>Başlangıç <b class="yildiz">*</b></span>
+                    <span>Bitiş <b class="yildiz">*</b></span>
+                    <span>Derslik <b class="yildiz">*</b></span>
+                    <span>Tür</span>
+                    <span></span>
+                </div>
+                <div id="oturum-listesi"></div>
+                <button type="button" class="satir-ekle" id="oturum-ekle">+ oturum ekle</button>
+                <p class="mesaj hata" id="oturum-hatasi" hidden></p>
+                <p class="mesaj uyari" id="oturum-uyarisi" hidden></p>
+            </section>
+
+            <!-- Değerlendirme kalemleri (opsiyonel, katlanabilir) -->
+            <details class="bolum" id="degerlendirme-bolumu">
+                <summary>Değerlendirme kalemleri <small>(opsiyonel)</small></summary>
+                <div class="satir degerlendirme-satiri satir-basliklari">
+                    <span>Ad <b class="yildiz">*</b></span>
+                    <span>Tür <b class="yildiz">*</b></span>
+                    <span>Ağırlık % <b class="yildiz">*</b></span>
+                    <span>Tarih</span>
+                    <span>Saat</span>
+                    <span></span>
+                </div>
+                <div id="degerlendirme-listesi"></div>
+                <button type="button" class="satir-ekle" id="degerlendirme-ekle">+ kalem ekle</button>
+                <p class="mesaj" id="agirlik-toplami" hidden></p>
+            </details>
+
+            <label class="alan">
+                <span>Notlar</span>
+                <textarea name="notlar" rows="2"></textarea>
+            </label>
+
+            <p class="mesaj hata" id="kayit-hatasi" hidden></p>
+
+            <footer class="pencere-dugmeleri">
+                <button type="button" class="dugme tehlikeli" id="sil-dugmesi" hidden>Sil</button>
+                <span class="bosluk"></span>
+                <button type="button" class="dugme" id="vazgec-dugmesi">Vazgeç</button>
+                <button type="submit" class="dugme ana" id="kaydet-dugmesi">Kaydet</button>
+            </footer>
+        </form>
+    </dialog>
+
+    <!-- Form satırı şablonları: JavaScript "+ ekle"ye basılınca bunları kopyalar. -->
+    <template id="oturum-sablonu">
+        <div class="satir oturum-satiri">
+            <select data-alan="gun" data-zorunlu aria-label="Gün">
+                <option value="">Gün</option>
+                {% for gun in gunler %}
+                <option value="{{ loop.index0 }}">{{ gun.kisaltma }}</option>
+                {% endfor %}
+            </select>
+            <input type="text" data-alan="baslangic" data-zorunlu data-saat placeholder="09:30" maxlength="5" aria-label="Başlangıç saati">
+            <input type="text" data-alan="bitis" data-zorunlu data-saat placeholder="11:00" maxlength="5" aria-label="Bitiş saati">
+            <input type="text" data-alan="derslik" data-zorunlu placeholder="B201" aria-label="Derslik">
+            <select data-alan="tur" aria-label="Tür">
+                <option value="">—</option>
+                {% for tur in oturum_turleri %}
+                <option value="{{ tur.anahtar }}">{{ tur.ad }}</option>
+                {% endfor %}
+            </select>
+            <button type="button" class="satir-sil" title="Oturumu sil" aria-label="Oturumu sil">×</button>
+        </div>
+    </template>
+
+    <template id="degerlendirme-sablonu">
+        <div class="satir degerlendirme-satiri">
+            <input type="text" data-alan="ad" data-zorunlu placeholder="Vize 1" aria-label="Ad">
+            <select data-alan="tur" data-zorunlu aria-label="Tür">
+                {% for tur in degerlendirme_turleri %}
+                <option value="{{ tur.anahtar }}">{{ tur.ad }}</option>
+                {% endfor %}
+            </select>
+            <input type="number" data-alan="agirlik" data-zorunlu min="0" step="any" placeholder="40" aria-label="Ağırlık yüzdesi">
+            <input type="date" data-alan="tarih" aria-label="Tarih">
+            <input type="text" data-alan="saat" data-saat placeholder="13:00" maxlength="5" aria-label="Saat">
+            <button type="button" class="satir-sil" title="Kalemi sil" aria-label="Kalemi sil">×</button>
+        </div>
+    </template>
+
     <script>
-        // Sayfa yenilenince tarayıcı eski kaydırma konumunu hatırlamasın:
-        // her açılışta sol üstten (Pazartesi, 09:00) başla.
-        document.getElementById("takvim").scrollTo(0, 0);
+        // Python'daki ayarlar (renkler, takvimin ilk ve son saati).
+        const AYARLAR = {{ ayarlar|tojson }};
     </script>
+    <script src="{{ url_for('static', filename='uygulama.js') }}"></script>
 </body>
 </html>
