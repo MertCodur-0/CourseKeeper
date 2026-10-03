@@ -95,12 +95,17 @@ CIKTI_SEMASI = {
                     "tur": {"type": "string", "enum": KALEM_TURLERI,
                             "description": "Genel tür. Listedekilere uymuyorsa 'diger'."},
                     "agirlik": _bos_olabilir("number", "Ağırlık yüzdesi (ör. %40 için 40)."),
+                    "ekstra_puan": {"type": "boolean",
+                                    "description": "Sadece belgede AÇIKÇA bonus / extra credit / ekstra puan "
+                                                   "olarak belirtilmişse true, yoksa false."},
                     "tarih": _bos_olabilir("string", "Tarih, YYYY-AA-GG biçiminde."),
                     "baslangic": _bos_olabilir("string", "Başlangıç saati, 24 saat biçiminde SS:DD."),
                     "bitis": _bos_olabilir("string", "Bitiş saati, 24 saat biçiminde SS:DD."),
-                    "emin_olmayanlar": _emin_olmayanlar(["tur", "agirlik", "tarih", "baslangic", "bitis"]),
+                    "emin_olmayanlar": _emin_olmayanlar(
+                        ["tur", "agirlik", "ekstra_puan", "tarih", "baslangic", "bitis"]),
                 },
-                "required": ["ad", "tur", "agirlik", "tarih", "baslangic", "bitis", "emin_olmayanlar"],
+                "required": ["ad", "tur", "agirlik", "ekstra_puan", "tarih", "baslangic", "bitis",
+                             "emin_olmayanlar"],
             },
         },
     },
@@ -138,7 +143,12 @@ Alanlar:
 - Tarihler: YYYY-AA-GG biçimine çevir (gg.aa.yyyy, gg/aa/yyyy, "15 March", "15 Mart" gibi yazımlar olabilir).
   Belgede yıl yoksa: bugünün tarihi {bugun.isoformat()}; tarihi, bugünün içinde bulunduğu akademik döneme
   denk gelen yılla yaz ve "tarih"i emin_olmayanlar listesine ekle.
+- ekstra_puan: kalem belgede AÇIKÇA "bonus", "extra credit", "ekstra puan", "ek puan" gibi bir ifadeyle
+  belirtilmişse true, aksi halde false. Ağırlıkların toplamı %100'ü aşsa bile, belgede böyle bir ifade yoksa
+  hiçbir kalemi kendiliğinden ekstra sayma; ağırlıkları değiştirme, kalemleri belgedeki gibi yaz.
 - Hedef harf notu, öğrencinin kendi notları gibi belgede olmayan bilgiler İSTENMİYOR.
+- Dersin harf notu tablosu, not aralıkları, çan eğrisi gibi notlandırma bilgileri de İSTENMİYOR;
+  belgede yazsa bile dikkate alma. Sadece yukarıdaki alanları oku.
 """
 
 

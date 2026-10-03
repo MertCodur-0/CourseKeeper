@@ -1,6 +1,7 @@
 import re
+import shutil
 import sqlite3
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
@@ -78,20 +79,28 @@ def yazi_rengi(arka_plan):
 for _renk in RENKLER:
     _renk["yazi"] = yazi_rengi(_renk["kod"])
 
-# Not ölçeği: harf notu -> 4'lük katsayı. Sadece burada tanımlı.
-# İleride hedef GPA ve vize/final için gereken not hesabında kullanılacak.
+# Harf notu ölçeği: sadece burada tanımlı. Bütün dersler MUTLAK notlandırma ile hesaplanır.
+#   katsayi   : 4'lük sistemdeki puan
+#   alt_sinir : o harfi almak için gereken en düşük ders puanı (AA: 90-100, BA: 85-89, ...)
+# Liste yüksekten düşüğe sıralıdır. F sadece "şu anki seviye"yi göstermek içindir.
 NOT_OLCEGI = [
-    {"harf": "AA", "katsayi": 4.0},
-    {"harf": "BA", "katsayi": 3.5},
-    {"harf": "BB", "katsayi": 3.0},
-    {"harf": "CB", "katsayi": 2.5},
-    {"harf": "CC", "katsayi": 2.0},
-    {"harf": "DC", "katsayi": 1.5},
-    {"harf": "DD", "katsayi": 1.0},
-    {"harf": "FF", "katsayi": 0.0},
+    {"harf": "AA", "katsayi": 4.0, "alt_sinir": 90},
+    {"harf": "BA", "katsayi": 3.5, "alt_sinir": 85},
+    {"harf": "BB", "katsayi": 3.0, "alt_sinir": 80},
+    {"harf": "CB", "katsayi": 2.5, "alt_sinir": 75},
+    {"harf": "CC", "katsayi": 2.0, "alt_sinir": 70},
+    {"harf": "DC", "katsayi": 1.5, "alt_sinir": 60},
+    {"harf": "DD", "katsayi": 1.0, "alt_sinir": 50},
+    {"harf": "F", "katsayi": 0.0, "alt_sinir": 0},
 ]
-# Hedef olarak seçilebilen notlar: FF dışındakiler.
+# Hedef olarak seçilebilen notlar: F dışındakiler (AA ... DD).
 HEDEF_NOTLARI = [satir["harf"] for satir in NOT_OLCEGI if satir["katsayi"] > 0]
+
+# Puan bir harfin alt sınırıyla karşılaştırılmadan önce nasıl yuvarlanır?
+#   "none"    : yuvarlama yok (89.99, 90 sayılmaz)
+#   "nearest" : en yakın tam sayıya yuvarlanır (89.5 ve üstü 90 sayılır)
+# Karşılaştırma tarayıcıda yapılır (uygulama.js: etkinEsik).
+ROUND_MODE = "none"
 
 OTURUM_TURLERI = [
     {"anahtar": "teori", "ad": "Teori"},
@@ -101,20 +110,26 @@ OTURUM_TURLERI = [
 # Değerlendirme kalemi türleri: sabit liste, sadece burada tanımlı.
 # Bir derste her tür en fazla bir kez kullanılır, yani tür o kalemi tek başına tanımlar.
 # "etiket": takvimdeki sınav bloğunda görünen yazı.
+# "den_hali": sağ paneldeki "Final'den en az 85 almalısın" cümlesi için (vize ve finalde kullanılır).
 DEGERLENDIRME_TURLERI = [
-    {"anahtar": "vize1", "ad": "Vize 1", "etiket": "VİZE 1"},
-    {"anahtar": "vize2", "ad": "Vize 2", "etiket": "VİZE 2"},
-    {"anahtar": "vize3", "ad": "Vize 3", "etiket": "VİZE 3"},
-    {"anahtar": "final", "ad": "Final", "etiket": "FİNAL"},
-    {"anahtar": "quiz", "ad": "Quiz", "etiket": "QUIZ"},
-    {"anahtar": "odev", "ad": "Ödev", "etiket": "ÖDEV"},
-    {"anahtar": "proje", "ad": "Proje", "etiket": "PROJE"},
-    {"anahtar": "lab", "ad": "Lab", "etiket": "LAB"},
-    {"anahtar": "diger1", "ad": "Diğer 1", "etiket": "DİĞER 1"},
-    {"anahtar": "diger2", "ad": "Diğer 2", "etiket": "DİĞER 2"},
-    {"anahtar": "diger3", "ad": "Diğer 3", "etiket": "DİĞER 3"},
+    {"anahtar": "vize1", "ad": "Vize 1", "etiket": "VİZE 1", "den_hali": "Vize 1'den"},
+    {"anahtar": "vize2", "ad": "Vize 2", "etiket": "VİZE 2", "den_hali": "Vize 2'den"},
+    {"anahtar": "vize3", "ad": "Vize 3", "etiket": "VİZE 3", "den_hali": "Vize 3'ten"},
+    {"anahtar": "final", "ad": "Final", "etiket": "FİNAL", "den_hali": "Final'den"},
+    {"anahtar": "quiz", "ad": "Quiz", "etiket": "QUIZ", "den_hali": "Quiz'den"},
+    {"anahtar": "odev", "ad": "Ödev", "etiket": "ÖDEV", "den_hali": "Ödev'den"},
+    {"anahtar": "proje", "ad": "Proje", "etiket": "PROJE", "den_hali": "Proje'den"},
+    {"anahtar": "lab", "ad": "Lab", "etiket": "LAB", "den_hali": "Lab'dan"},
+    {"anahtar": "diger1", "ad": "Diğer 1", "etiket": "DİĞER 1", "den_hali": "Diğer 1'den"},
+    {"anahtar": "diger2", "ad": "Diğer 2", "etiket": "DİĞER 2", "den_hali": "Diğer 2'den"},
+    {"anahtar": "diger3", "ad": "Diğer 3", "etiket": "DİĞER 3", "den_hali": "Diğer 3'ten"},
 ]
 DIGER_TURLERI = ["diger1", "diger2", "diger3"]
+
+# Alınan puanı 100 üzerinden girilen türler: katkı = ağırlık × girilen / 100.
+# Diğer bütün türlerde (quiz, ödev, proje, lab, diğer; ekstra olanlar dahil) girilen değer
+# 0 ile kalemin ağırlığı arasında doğrudan PUAN'dır: katkı = girilen değer.
+YUZ_UZERINDEN_TURLER = ["vize1", "vize2", "vize3", "final"]
 
 # Numarasız genel türlerin (eski sürümden ya da syllabus'tan gelen) listedeki karşılıkları.
 # Burada olmayan türlerin anahtarı aynıdır (final, quiz, odev, proje, lab).
@@ -136,6 +151,10 @@ def bos_tur_bul(tur, dolu_turler):
         (aday for aday in adaylar if aday in gecerli_turler and aday not in dolu_turler), None
     )
 
+
+# Tek bir değerlendirme kaleminin ağırlığı en fazla bu kadar olabilir (yanlış yazımlara karşı).
+# Kalemlerin TOPLAMI %100'ü aşabilir (ekstra puan), toplam için sınır yoktur.
+EN_FAZLA_AGIRLIK = 200
 
 # "09:00" gibi tam saat biçimi (dakika hep 00).
 TAM_SAAT_KALIBI = re.compile(r"^([01]\d|2[0-3]):00$")
@@ -186,7 +205,7 @@ def veritabani_hazirla():
             akts              REAL,
             devamsizlik_hakki REAL,               -- yüzde, ör. 30
             renk              TEXT NOT NULL,      -- RENKLER listesindeki anahtar
-            notlar            TEXT,               -- formda yok; ileride sağ panelde kullanılacak
+            notlar            TEXT,               -- formda yok; sağ paneldeki "Notlar" sekmesinden yazılır
             hedef_not         TEXT,               -- "AA", "BA" ... (eski derslerde boş olabilir)
             devamsizlik_metni TEXT,               -- formda yok: syllabus'ta yüzde olarak yazmayan devamsızlık kuralı
             sinav_rengi       TEXT                -- sınav bloklarının rengi (RENKLER anahtarı)
@@ -210,22 +229,28 @@ def veritabani_hazirla():
             ad         TEXT NOT NULL,             -- formda yok: kalemin eski sürümdeki ya da syllabus'taki adı
             tur        TEXT NOT NULL,             -- DEGERLENDIRME_TURLERI listesindeki anahtar
             agirlik    REAL NOT NULL,             -- yüzde, ör. 40
+            ekstra_puan INTEGER NOT NULL DEFAULT 0, -- 1: ekstra (bonus) puan, normal toplama sayılmaz
+            alinan_puan REAL,                     -- vize/final: 0-100; diğerleri: 0-ağırlık; boş: açıklanmadı
             tarih      TEXT,                      -- "2026-11-15"
             saat       TEXT,                      -- başlangıç saati, "13:00"
             bitis_saat TEXT                       -- boşsa süre 1 saat kabul edilir
         );
     """)
     silinenler = veritabani_guncelle(baglanti)
+    veri_surumunu_yukselt(baglanti)
     baglanti.close()
     for silinen in silinenler:
         print("UYARI: yer kalmadığı için silinen değerlendirme kalemi ->", silinen)
 
 
-def sutun_yoksa_ekle(baglanti, tablo, sutun):
-    """Eski veritabanında olmayan bir sütunu ekler. Mevcut satırlarda bu sütun boş kalır."""
+def sutun_yoksa_ekle(baglanti, tablo, sutun, tanim="TEXT"):
+    """Eski veritabanında olmayan bir sütunu ekler.
+
+    Mevcut satırlarda bu sütun boş kalır (tanımda DEFAULT varsa o değeri alır).
+    """
     mevcut_sutunlar = [satir["name"] for satir in baglanti.execute(f"PRAGMA table_info({tablo})")]
     if sutun not in mevcut_sutunlar:
-        baglanti.execute(f"ALTER TABLE {tablo} ADD COLUMN {sutun} TEXT")
+        baglanti.execute(f"ALTER TABLE {tablo} ADD COLUMN {sutun} {tanim}")
 
 
 def veritabani_guncelle(baglanti):
@@ -238,6 +263,10 @@ def veritabani_guncelle(baglanti):
     sutun_yoksa_ekle(baglanti, "dersler", "sinav_rengi")
     sutun_yoksa_ekle(baglanti, "dersler", "devamsizlik_metni")
     sutun_yoksa_ekle(baglanti, "degerlendirmeler", "bitis_saat")
+    # Mevcut bütün kalemler "ekstra değil" (0) olarak kalır.
+    sutun_yoksa_ekle(baglanti, "degerlendirmeler", "ekstra_puan", "INTEGER NOT NULL DEFAULT 0")
+    # Mevcut kalemlerde alınan puan boş kalır.
+    sutun_yoksa_ekle(baglanti, "degerlendirmeler", "alinan_puan", "REAL")
 
     silinenler = []
     # "with baglanti": içindeki işlemler tek seferde kaydedilir, hata olursa hiçbiri kaydedilmez.
@@ -275,6 +304,62 @@ def veritabani_guncelle(baglanti):
     return silinenler
 
 
+def veri_surumunu_yukselt(baglanti):
+    """Bir kez yapılması gereken veri dönüşümlerini uygular.
+
+    Hangi dönüşümlerin yapıldığı veritabanının içindeki sürüm numarasından (PRAGMA user_version)
+    anlaşılır; sunucu yeniden başlayınca aynı dönüşüm tekrar uygulanmaz.
+
+    Sürüm 1: Eskiden bütün kalemlerin alınan puanı 100 üzerinden saklanıyordu. Vize ve final
+    dışındaki kalemlerde değer artık doğrudan puandır: yeni = eski × ağırlık / 100.
+    Dönüşümden önce veritabanının yedeği alınır; her dersin toplam puanı aynı kalmalıdır.
+    """
+    # Başka bir işlem aynı anda dönüştürmesin diye önce yazma kilidi alınır.
+    baglanti.execute("BEGIN IMMEDIATE")
+    try:
+        surum = baglanti.execute("PRAGMA user_version").fetchone()[0]
+        if surum < 1:
+            puanli_kalemler = baglanti.execute(
+                "SELECT id, ders_id, tur, agirlik, alinan_puan FROM degerlendirmeler"
+                " WHERE alinan_puan IS NOT NULL"
+            ).fetchall()
+            donusecekler = [k for k in puanli_kalemler if k["tur"] not in YUZ_UZERINDEN_TURLER]
+            if donusecekler:
+                yedek = PROJE_KLASORU / f"derstakip.backup-{datetime.now():%Y-%m-%d-%H%M%S}-donusum-oncesi.db"
+                shutil.copy2(VERITABANI_DOSYASI, yedek)
+                print(f"Veri dönüşümü (sürüm 1): {len(donusecekler)} kalem dönüştürülüyor. Yedek: {yedek.name}")
+
+            # Dönüşümden önce her dersin kazanılan puanı (eski kural: hepsi 100 üzerinden).
+            onceki = {}
+            for kalem in puanli_kalemler:
+                katki = kalem["agirlik"] * kalem["alinan_puan"] / 100
+                onceki[kalem["ders_id"]] = onceki.get(kalem["ders_id"], 0) + katki
+
+            sonraki = {}
+            for kalem in puanli_kalemler:
+                if kalem["tur"] in YUZ_UZERINDEN_TURLER:
+                    katki = kalem["agirlik"] * kalem["alinan_puan"] / 100
+                else:
+                    katki = round(kalem["alinan_puan"] * kalem["agirlik"] / 100, 2)
+                    baglanti.execute(
+                        "UPDATE degerlendirmeler SET alinan_puan = ? WHERE id = ?", (katki, kalem["id"])
+                    )
+                sonraki[kalem["ders_id"]] = sonraki.get(kalem["ders_id"], 0) + katki
+
+            # Kontrol: toplamlar aynı kalmalı (fark sadece 2 basamağa yuvarlamadan gelebilir).
+            for ders_id, eski_toplam in onceki.items():
+                if abs(sonraki[ders_id] - eski_toplam) > 0.005 * len(donusecekler) + 1e-9:
+                    raise RuntimeError(
+                        f"Veri dönüşümü durduruldu: {ders_id} numaralı dersin toplam puanı değişiyor "
+                        f"({eski_toplam} -> {sonraki[ders_id]}). Hiçbir değişiklik kaydedilmedi."
+                    )
+            baglanti.execute("PRAGMA user_version = 1")
+        baglanti.commit()
+    except Exception:
+        baglanti.rollback()
+        raise
+
+
 def dersleri_getir(baglanti):
     """Bütün dersleri, oturumları ve değerlendirme kalemleriyle birlikte döndürür."""
     dersler = [dict(satir) for satir in baglanti.execute("SELECT * FROM dersler ORDER BY id")]
@@ -285,10 +370,14 @@ def dersleri_getir(baglanti):
             (ders["id"],),
         )]
         ders["degerlendirmeler"] = [dict(satir) for satir in baglanti.execute(
-            "SELECT id, ad, tur, agirlik, tarih, saat, bitis_saat FROM degerlendirmeler"
+            "SELECT id, ad, tur, agirlik, ekstra_puan, alinan_puan, tarih, saat, bitis_saat"
+            " FROM degerlendirmeler"
             " WHERE ders_id = ? ORDER BY id",
             (ders["id"],),
         )]
+        for kalem in ders["degerlendirmeler"]:
+            # Veritabanında 0/1 tutulur; dışarıya evet/hayır (true/false) olarak verilir.
+            kalem["ekstra_puan"] = bool(kalem["ekstra_puan"])
     return dersler
 
 
@@ -337,7 +426,8 @@ def alt_satirlari_esitle(baglanti, tablo, sutunlar, ders_id, satirlar):
 def dersi_kaydet(baglanti, ders, ders_id=None):
     """Dersi ekler (ders_id yoksa) veya günceller. Dersin kimliğini döndürür.
 
-    "notlar" sütununa dokunulmaz (formda yok, mevcut değer aynen kalır).
+    "notlar" sütununa ve kalemlerin "alinan_puan" değerine dokunulmaz (formda yoklar, sağ panelden
+    yazılırlar; mevcut değerler aynen kalır).
     "devamsizlik_metni" sadece ders eklenirken yazılır (syllabus'tan gelir), güncellemede aynen kalır.
     """
     degerler = [ders["kod"], ders["ad"], ders["kredi"], ders["akts"],
@@ -359,7 +449,7 @@ def dersi_kaydet(baglanti, ders, ders_id=None):
                          ["gun", "baslangic", "bitis", "derslik", "tur"],
                          ders_id, ders["oturumlar"])
     alt_satirlari_esitle(baglanti, "degerlendirmeler",
-                         ["ad", "tur", "agirlik", "tarih", "saat", "bitis_saat"],
+                         ["ad", "tur", "agirlik", "ekstra_puan", "tarih", "saat", "bitis_saat"],
                          ders_id, ders["degerlendirmeler"])
 
     # Sınav rengi: dersin ilk tarihli kalemi eklenince otomatik atanır ve dersle saklanır.
@@ -464,8 +554,10 @@ def dersi_dogrula(veri):
             agirlik = sayiya_cevir(kalem.get("agirlik"))
         except ValueError:
             agirlik = None
-        if tur not in degerlendirme_turleri or agirlik is None or agirlik < 0:
+        if tur not in degerlendirme_turleri or agirlik is None:
             return None, "Değerlendirme kalemlerinde tür ve ağırlık zorunlu."
+        if not 0 <= agirlik <= EN_FAZLA_AGIRLIK:
+            return None, f"Bir kalemin ağırlığı %0 ile %{EN_FAZLA_AGIRLIK} arasında olmalı."
         if tur in kullanilan_turler:
             return None, "Aynı değerlendirme türü bir derste en fazla bir kez kullanılabilir."
         kullanilan_turler.add(tur)
@@ -479,6 +571,8 @@ def dersi_dogrula(veri):
         # "ad" formda görünmez; satırla birlikte taşınır (eski sürümdeki ya da syllabus'taki ad).
         degerlendirmeler.append({"id": satir_kimligi(kalem), "ad": metin(kalem.get("ad")),
                                  "tur": tur, "agirlik": agirlik,
+                                 # Sadece açıkça işaretlenmişse ekstra; aksi halde normal kalem.
+                                 "ekstra_puan": 1 if kalem.get("ekstra_puan") is True else 0,
                                  "tarih": tarih, "saat": saat, "bitis_saat": bitis_saat})
 
     renk = metin(veri.get("renk"))
@@ -619,7 +713,7 @@ def syllabus_forma_cevir(ham):
         if not isinstance(ham_kalem, dict):
             continue
         ad = metin(ham_kalem.get("ad"))
-        agirlik = syllabus_sayisi(ham_kalem.get("agirlik"))
+        agirlik = syllabus_sayisi(ham_kalem.get("agirlik"), en_fazla=EN_FAZLA_AGIRLIK)
         genel_tur = ham_kalem.get("tur") if ham_kalem.get("tur") in syllabus.KALEM_TURLERI else "diger"
         tur = bos_tur_bul(genel_tur, dolu_turler)
         if tur is None:
@@ -636,6 +730,8 @@ def syllabus_forma_cevir(ham):
             "ad": ad,
             "tur": tur,
             "agirlik": agirlik,
+            # Sadece belgede açıkça bonus/ekstra denmişse işaretli gelir; toplam %100'ü aşsa da uydurulmaz.
+            "ekstra_puan": ham_kalem.get("ekstra_puan") is True,
             "tarih": tarih if tarih_gecerli_mi(tarih) else None,
             "saat": saat,
             "bitis_saat": bitis_saat,
@@ -651,7 +747,8 @@ def syllabus_forma_cevir(ham):
         form_alanlari = {"baslangic": "saat", "bitis": "bitis_saat"}
         for alan in emin_olmayanlar(ham_kalem):
             alan = form_alanlari.get(alan, alan)
-            if alan in ("tur", "agirlik", "tarih", "saat", "bitis_saat") and kalem[alan] is not None:
+            if (alan in ("tur", "agirlik", "ekstra_puan", "tarih", "saat", "bitis_saat")
+                    and kalem[alan] is not None):
                 isaret_ekle(kalem["isaretler"], alan, "model emin değil")
         ders["degerlendirmeler"].append(kalem)
 
@@ -688,6 +785,7 @@ def ana_sayfa():
         bitis_saatleri=BITIS_SAATLERI,
         oturum_turleri=OTURUM_TURLERI,
         degerlendirme_turleri=DEGERLENDIRME_TURLERI,
+        en_fazla_agirlik=EN_FAZLA_AGIRLIK,
         # JavaScript'in ihtiyaç duyduğu ayarlar (sayfaya JSON olarak yazılır).
         ayarlar={
             "renkler": RENKLER,
@@ -697,6 +795,9 @@ def ana_sayfa():
             "bugun": bugun.isoformat(),
             "degerlendirmeTurleri": DEGERLENDIRME_TURLERI,
             "syllabusEnFazlaMB": SYLLABUS_EN_FAZLA_MB,
+            "notOlcegi": NOT_OLCEGI,
+            "yuzUzerindenTurler": YUZ_UZERINDEN_TURLER,
+            "roundMode": ROUND_MODE,
         },
     )
 
@@ -744,6 +845,56 @@ def api_ders_guncelle(ders_id):
         dersi_kaydet(baglanti, ders, ders_id)
     baglanti.close()
     return jsonify({"id": ders_id})
+
+
+# ============================================================
+# SAĞ PANEL API'si (ders notları ve kalemlerden alınan puanlar)
+# ============================================================
+
+@app.route("/api/dersler/<int:ders_id>/notlar", methods=["PUT"])
+def api_notlari_kaydet(ders_id):
+    """Dersin serbest metin notlarını kaydeder (sağ paneldeki "Notlar" sekmesi)."""
+    veri = request.get_json(silent=True) or {}
+    notlar = veri.get("notlar")
+    if notlar is not None and not isinstance(notlar, str):
+        return jsonify({"hata": "Notlar metin olmalı."}), 400
+    baglanti = veritabani_baglan()
+    with baglanti:
+        imlec = baglanti.execute("UPDATE dersler SET notlar = ? WHERE id = ?", (notlar or None, ders_id))
+    baglanti.close()
+    if imlec.rowcount == 0:
+        return jsonify({"hata": "Ders bulunamadı."}), 404
+    return jsonify({"kaydedildi": True})
+
+
+@app.route("/api/degerlendirmeler/<int:kalem_id>/puan", methods=["PUT"])
+def api_puani_kaydet(kalem_id):
+    """Bir değerlendirme kaleminden alınan puanı kaydeder (boş = henüz açıklanmadı).
+
+    Vize ve finalde puan 0-100 arasındadır; diğer kalemlerde 0 ile kalemin ağırlığı arasında.
+    """
+    veri = request.get_json(silent=True) or {}
+    try:
+        puan = sayiya_cevir(veri.get("alinan_puan"))
+    except ValueError:
+        puan = -1   # sayı değil: aşağıdaki aralık kontrolüne takılır
+    baglanti = veritabani_baglan()
+    kalem = baglanti.execute(
+        "SELECT tur, agirlik FROM degerlendirmeler WHERE id = ?", (kalem_id,)
+    ).fetchone()
+    if kalem is None:
+        baglanti.close()
+        return jsonify({"hata": "Değerlendirme kalemi bulunamadı."}), 404
+    en_fazla = 100 if kalem["tur"] in YUZ_UZERINDEN_TURLER else kalem["agirlik"]
+    if puan is not None:
+        puan = round(puan, 2)   # en fazla 2 ondalık basamak
+        if not 0 <= puan <= en_fazla:
+            baglanti.close()
+            return jsonify({"hata": f"Puan 0 ile {en_fazla:g} arasında olmalı."}), 400
+    with baglanti:
+        baglanti.execute("UPDATE degerlendirmeler SET alinan_puan = ? WHERE id = ?", (puan, kalem_id))
+    baglanti.close()
+    return jsonify({"alinan_puan": puan})
 
 
 # ============================================================

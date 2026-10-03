@@ -18,6 +18,7 @@
     --hata: #e03131;              /* eksik alan çerçevesi, hata yazısı, Sil butonu */
     --uyari-yazi: #8a6100;        /* sarı uyarı yazısı */
     --uyari-zemin: #fff4cc;       /* sarı uyarı zemini */
+    --tamam-yazi: #2b8a3e;        /* "Toplam: %100" yazısı (yeşil) */
     --uyari-cerceve: #e0a800;     /* sarı işaretli (kontrol edilecek) alanın çerçevesi */
 
     /* Sabit ölçüler */
@@ -58,9 +59,294 @@ body {
 }
 
 .yan-panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;                 /* dar pencerede içerik paneli genişletmesin */
+    min-height: 0;
+    overflow: hidden;
     background: var(--panel-arka-plan);
     border: 1px solid var(--cerceve);
     border-radius: 12px;
+    font-size: 13px;
+}
+
+/* ============================================================
+   SAĞ PANEL: görünümler (boş durum, ders paneli)
+   ============================================================ */
+.panel-gorunumu {
+    flex: 1;
+    min-height: 0;
+}
+
+.panel-bos {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+    color: var(--soluk-yazi);
+}
+
+.ders-paneli {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 14px 0;
+}
+
+.panel-baslik {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.renk-noktasi {
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+    margin-top: 4px;
+    border-radius: 50%;
+}
+
+.panel-adlar {
+    flex: 1;
+    min-width: 0;
+}
+
+.panel-adlar h2 {
+    margin: 0;
+    font-size: 16px;
+    overflow-wrap: anywhere;
+}
+
+.panel-adlar p,
+.panel-kunye {
+    margin: 2px 0 0;
+    color: var(--soluk-yazi);
+    font-size: 12px;
+}
+
+.panel-kunye {
+    margin: 0;
+}
+
+/* ---------- Sekmeler ---------- */
+
+.sekmeler {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--cizgi);
+}
+
+.sekmeler button {
+    padding: 6px 8px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--soluk-yazi);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.sekmeler button.secili {
+    border-bottom-color: var(--vurgu);
+    color: var(--vurgu);
+}
+
+/* Sekmenin içeriği: panelin kalan yüksekliğini doldurur, uzunsa kendi içinde kayar. */
+.sekme-icerigi {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-bottom: 14px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.sekme-icerigi .mesaj {
+    margin: 0;
+}
+
+/* ---------- Not hesabı ---------- */
+
+#hesap-ozeti {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Küçük gri satırlar: kutunun içindeki "Şu an: ..." ve kutunun altındaki toplam notu */
+.kucuk-not {
+    margin: 0;
+    font-size: 12px;
+    color: var(--soluk-yazi);
+}
+
+.hesap-sonucu .kucuk-not {
+    margin-top: 8px;
+}
+
+/* Sonuç mesajı: büyük ve net */
+.hesap-sonucu {
+    padding: 12px;
+    border: 1px solid var(--cerceve);
+    border-radius: 10px;
+    background: var(--yuzey);
+}
+
+.hesap-sonucu strong {
+    display: block;
+    font-size: 17px;
+    line-height: 1.3;
+}
+
+.hesap-sonucu p,
+.hesap-sonucu ul {
+    margin: 6px 0 0;
+    color: var(--soluk-yazi);
+}
+
+.hesap-sonucu ul {
+    padding-left: 18px;
+}
+
+.hesap-sonucu .dugme {
+    margin-top: 10px;
+}
+
+.panel-tablosu {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.panel-tablosu td {
+    padding: 5px 4px 5px 0;
+    border-top: 1px solid var(--cizgi);
+}
+
+.panel-tablosu .sayi {
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* Kalem listesi: satırlar ilk satır dahil çizgisiz başlar, aralarında ince çizgi olur. */
+.panel-tablosu tr:first-child td {
+    border-top: 0;
+}
+
+/* Kalem adının yanındaki küçük gri ağırlık ve puan alanının yanındaki "/ 10" sınır etiketi */
+.kalem-agirligi,
+.puan-siniri {
+    font-size: 11.5px;
+    color: var(--soluk-yazi);
+}
+
+.kalem-agirligi {
+    margin-left: 6px;
+}
+
+.puan-siniri {
+    display: inline-block;
+    min-width: 34px;
+    margin-left: 4px;
+    text-align: left;
+}
+
+.panel-tablosu input {
+    width: 62px;
+    padding: 4px 6px;
+    border: 1px solid var(--cerceve);
+    border-radius: 7px;
+    background: var(--yuzey);
+    color: inherit;
+    font: inherit;
+    text-align: right;
+}
+
+.panel-tablosu input:focus {
+    outline: 2px solid var(--vurgu-zemin);
+    border-color: var(--vurgu);
+}
+
+.panel-tablosu input.eksik {
+    border-color: var(--hata);
+}
+
+/* "ekstra" etiketi */
+.ekstra-etiketi {
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--vurgu-zemin);
+    color: var(--vurgu);
+    font-size: 10.5px;
+}
+
+/* Sınav bloğundan gelindiğinde ilgili kalemin satırı kısa süre vurgulanır. */
+.panel-tablosu tr.vurgulu td {
+    animation: satir-vurgusu 1.6s ease-out;
+}
+
+@keyframes satir-vurgusu {
+    from { background: var(--uyari-zemin); }
+    to { background: transparent; }
+}
+
+/* ---------- Notlar ---------- */
+
+.ders-notlari {
+    flex: 1;
+    min-height: 160px;
+    padding: 8px 10px;
+    border: 1px solid var(--cerceve);
+    border-radius: 8px;
+    background: var(--yuzey);
+    color: inherit;
+    font: inherit;
+    line-height: 1.4;
+    resize: none;
+}
+
+.ders-notlari:focus {
+    outline: 2px solid var(--vurgu-zemin);
+    border-color: var(--vurgu);
+}
+
+.not-durumu {
+    min-height: 15px;
+    font-size: 11px;
+    color: var(--soluk-yazi);
+}
+
+/* ---------- Bilgi ---------- */
+
+#bilgi-duzenle {
+    align-self: flex-start;
+}
+
+#bilgi-icerigi h3 {
+    margin: 12px 0 4px;
+    font-size: 12px;
+    color: var(--soluk-yazi);
+    font-weight: 600;
+}
+
+#bilgi-icerigi h3:first-child {
+    margin-top: 0;
+}
+
+#bilgi-icerigi ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+#bilgi-icerigi li {
+    padding: 4px 0;
+    border-top: 1px solid var(--cizgi);
 }
 
 /* ============================================================
@@ -320,6 +606,24 @@ body {
 .ders-blogu:hover {
     transform: translateY(-1px);
     filter: drop-shadow(0 7px 8px rgba(0, 0, 0, 0.26));
+}
+
+/* Sağ panelde seçili olan dersin blokları: şekli takip eden ince koyu çerçeve.
+   (Kutu clip-path ile kesildiği için normal çerçeve görünmez; dört yöne verilen
+   keskin gölgeler çerçeve gibi durur.) */
+.ders-blogu.secili,
+.ders-blogu.secili:hover {
+    filter:
+        drop-shadow(1.5px 0 0 var(--baslik-rengi))
+        drop-shadow(-1.5px 0 0 var(--baslik-rengi))
+        drop-shadow(0 1.5px 0 var(--baslik-rengi))
+        drop-shadow(0 -1.5px 0 var(--baslik-rengi))
+        drop-shadow(0 4px 5px rgba(0, 0, 0, 0.18));
+}
+
+.serit-etiketi.secili {
+    outline: 2px solid var(--baslik-rengi);
+    outline-offset: -1px;
 }
 
 /* Kutu: bloğun görünen ve tıklanan kısmı. Rengi ve şekli (clip-path) JavaScript'ten gelir.
@@ -743,7 +1047,24 @@ body {
 }
 
 .degerlendirme-satiri {
-    grid-template-columns: 1fr 84px 140px 88px 88px 24px;
+    grid-template-columns: 1fr 84px 68px 140px 88px 88px 24px;
+}
+
+/* "Ekstra puan" onay kutusu: diğer alanlar gibi tam genişlik değil, küçük ve ortalı. */
+.ders-formu input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    margin: 0;
+    justify-self: center;
+    accent-color: var(--vurgu);
+    cursor: pointer;
+}
+
+/* Onay kutusunda çerçeve rengi görünmediği için sarı işaret dış çizgiyle verilir. */
+.ders-formu input[type="checkbox"].emin-degil {
+    outline: 2px solid var(--uyari-cerceve);
+    outline-offset: 2px;
 }
 
 .satir-basliklari {
@@ -787,6 +1108,11 @@ body {
 
 .mesaj.hata {
     color: var(--hata);
+}
+
+/* Ağırlık toplamı tam %100 */
+.mesaj.tamam {
+    color: var(--tamam-yazi);
 }
 
 .mesaj.uyari {

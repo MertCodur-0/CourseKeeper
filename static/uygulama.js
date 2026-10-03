@@ -1,5 +1,5 @@
 // DersTakip'in tarayıcı tarafı: dersleri sunucudan alır, takvime blok olarak
-// çizer ve ders ekleme/düzenleme formunu yönetir.
+// çizer, ders ekleme/düzenleme formunu ve sağ paneli (not hesabı, notlar, bilgi) yönetir.
 
 // ============================================================
 // DURUM
@@ -116,6 +116,7 @@ async function dersleriYukle() {
     dersler = sonuc.dersler;
     siradakiRenk = sonuc.siradaki_renk;
     takvimiCiz();
+    paneliYenile();
 }
 
 // ---------- Çakışan bloklar: "boşluk doldurma" düzeni ----------
@@ -320,6 +321,8 @@ function blokOlustur(yerlesim) {
     blok.className = "ders-blogu";
     // Tıklama noktası: blok, ait olduğu dersin kimliğini taşır.
     blok.dataset.dersId = yerlesim.ders.id;
+    // Sınav bloğu ayrıca hangi kaleme ait olduğunu da taşır (panelde o satır vurgulanır).
+    if (yerlesim.kalemId != null) blok.dataset.kalemId = yerlesim.kalemId;
     blok.style.setProperty("--baslangic", yerlesim.bas);            // ör. 9
     blok.style.setProperty("--sure", yerlesim.bit - yerlesim.bas);  // ör. 2
     // Yazı sığmayıp kesilirse bilgiler üzerine gelince buradan okunur.
@@ -371,11 +374,12 @@ function blokOlustur(yerlesim) {
 }
 
 // Saati olmayan (veya takvim saatlerinin dışında kalan) sınav için şeritteki küçük etiket.
-function seritEtiketiOlustur(ders, yazi) {
+function seritEtiketiOlustur(ders, yazi, kalemId) {
     const renk = renkBul(ders.sinav_rengi);
     const etiket = document.createElement("div");
     etiket.className = "serit-etiketi";
     etiket.dataset.dersId = ders.id;
+    etiket.dataset.kalemId = kalemId;
     etiket.style.background = renk.kod;
     etiket.style.color = renk.yazi;
     etiket.title = yazi;
@@ -477,13 +481,14 @@ function takvimiCiz() {
                         ders, bas: aralik.bas, bit: aralik.bit,
                         renk: renkBul(ders.sinav_rengi),
                         altYazi: etiket,
+                        kalemId: kalem.id,
                         ipucu: `${ders.kod} · ${etiket} · ${kalem.saat}-${bitisYazisi}`,
                     });
                 } else {
                     // Saati yok ya da 09:00-21:00 dışında: üstteki şeritte küçük etiket.
                     let yazi = `${ders.kod} · ${etiket}`;
                     if (kalem.saat) yazi += ` · ${kalem.saat}` + (kalem.bitis_saat ? `-${kalem.bitis_saat}` : "");
-                    seritHucresi.appendChild(seritEtiketiOlustur(ders, yazi));
+                    seritHucresi.appendChild(seritEtiketiOlustur(ders, yazi, kalem.id));
                     seritDolu = true;
                 }
             }
@@ -497,6 +502,7 @@ function takvimiCiz() {
     // Haftada hiç şerit etiketi yoksa şerit satırı hiç görünmez.
     izgara.querySelectorAll(".serit").forEach((hucre) => { hucre.hidden = !seritDolu; });
     bloklariSigdir();
+    seciliVurguyuGuncelle();
 }
 
 // Gösterilen haftayı değiştirir. kayma: -1 önceki, 1 sonraki, 0 bu haftaya dön.
@@ -672,6 +678,10 @@ function satirEkle(sablonId, liste, veri = {}) {
             notlar.push(`${alan.getAttribute("aria-label")}: ${aciklama}`);
         }
         if (deger == null) return;
+        if (alan.type === "checkbox") {
+            alan.checked = Boolean(deger);
+            return;
+        }
         if (alan.dataset.saat) {
             // Eski kayıtta tam saat olmayan değer: başlangıç aşağı, bitiş yukarı yuvarlanır.
             deger = saatiYuvarla(deger, alan.dataset.saat);
@@ -738,7 +748,8 @@ function satiriOku(satir) {
     if (satir.dataset.id) veri.id = Number(satir.dataset.id);
     if (satir.dataset.ad) veri.ad = satir.dataset.ad;
     satir.querySelectorAll("[data-alan]").forEach((alan) => {
-        veri[alan.dataset.alan] = alan.value.trim();
+        // Onay kutusu (ekstra puan) evet/hayır olarak, diğer alanlar yazı olarak okunur.
+        veri[alan.dataset.alan] = alan.type === "checkbox" ? alan.checked : alan.value.trim();
     });
     return veri;
 }
@@ -763,12 +774,13 @@ function formuOku() {
 function formuDogrula() {
     let gecerli = true;
 
-    // 1) Tek tek alanlar: boş zorunlu alan, negatif sayı.
+    // 1) Tek tek alanlar: boş zorunlu alan, negatif ya da üst sınırı aşan sayı.
     form.querySelectorAll("input, select").forEach((alan) => {
         const deger = alan.value.trim();
         let eksik = false;
         if ("zorunlu" in alan.dataset && deger === "") eksik = true;
         if (alan.type === "number" && deger !== "" && Number(deger) < 0) eksik = true;
+        if (alan.type === "number" && alan.max !== "" && Number(deger) > Number(alan.max)) eksik = true;
         alan.classList.toggle("eksik", eksik);
         if (eksik) gecerli = false;
     });
@@ -812,17 +824,33 @@ function formuDogrula() {
     // Bütün türler kullanıldıysa yeni kalem eklenemez.
     degerlendirmeEkle.disabled = turAlanlari.length >= AYARLAR.degerlendirmeTurleri.length;
 
-    // 4) Değerlendirme ağırlıklarının toplamı (kaydı engellemez, sadece uyarır).
-    const agirliklar = [...degerlendirmeListesi.querySelectorAll('[data-alan="agirlik"]')];
-    if (agirliklar.length === 0) {
-        mesajGoster(agirlikToplami, "");
-    } else {
-        let toplam = agirliklar.reduce((ara, alan) => ara + (Number(alan.value) || 0), 0);
-        toplam = Math.round(toplam * 100) / 100;
-        const tamam = toplam === 100;
-        mesajGoster(agirlikToplami, tamam ? "Toplam: %100" : `Toplam: %${toplam} — ağırlıkların toplamı %100 değil.`);
-        agirlikToplami.classList.toggle("uyari", !tamam);
+    // 4) Değerlendirme ağırlıklarının özeti. Hiçbir durumda kaydı engellemez, sadece bilgilendirir.
+    //    "Ekstra puan" işaretli kalemler normal toplama değil, ayrı bir ekstra toplamına sayılır.
+    const kalemSatirlari = [...degerlendirmeListesi.children];
+    let normalToplam = 0;
+    let ekstraToplam = 0;
+    for (const satir of kalemSatirlari) {
+        const agirlik = Number(satir.querySelector('[data-alan="agirlik"]').value) || 0;
+        if (satir.querySelector('[data-alan="ekstra_puan"]').checked) ekstraToplam += agirlik;
+        else normalToplam += agirlik;
     }
+    normalToplam = Math.round(normalToplam * 100) / 100;
+    ekstraToplam = Math.round(ekstraToplam * 100) / 100;
+    const ekstraYazisi = ekstraToplam > 0 ? ` + %${ekstraToplam} ekstra` : "";
+    let ozet = "";
+    if (kalemSatirlari.length === 0) {
+        ozet = "";
+    } else if (normalToplam === 100) {
+        ozet = `Toplam: %100${ekstraYazisi}`;
+    } else if (normalToplam < 100) {
+        ozet = `Toplam: %${normalToplam}${ekstraYazisi}. Eksik: %${Math.round((100 - normalToplam) * 100) / 100}`;
+    } else {
+        // %100'ü aşmak hata değil: ekstra puanlı derslerde olur. Sakin bir bilgi notu yeter.
+        ozet = `Toplam %${normalToplam}${ekstraYazisi}. Ekstra puan varsa ilgili kalemi “Ekstra puan” olarak işaretle.`;
+    }
+    mesajGoster(agirlikToplami, ozet);
+    agirlikToplami.classList.toggle("tamam", normalToplam === 100);
+    agirlikToplami.classList.toggle("uyari", normalToplam < 100);
 
     kaydetDugmesi.disabled = !gecerli;
     return gecerli;
@@ -923,19 +951,475 @@ document.getElementById("onceki-hafta").addEventListener("click", () => haftayiD
 document.getElementById("bugune-don").addEventListener("click", () => haftayiDegistir(0));
 document.getElementById("sonraki-hafta").addEventListener("click", () => haftayiDegistir(1));
 
-// Bloğa (veya şerit etiketine) tıklanınca çalışır. Şimdilik hiçbir şey yapmaz;
-// ileride dersin sağ paneli buradan açılacak.
-function dersTiklandi(ders) {
-}
-
-// Takvimdeki tıklamalar: "⋯" butonu düzenleme formunu açar, bloğun kendisi dersTiklandi'yi çağırır.
+// Takvimdeki tıklamalar: "⋯" butonu düzenleme formunu, bloğun kendisi dersin sağ panelini açar.
 izgara.addEventListener("click", (olay) => {
     const tasiyici = olay.target.closest("[data-ders-id]");
     if (!tasiyici) return;
     const ders = dersler.find((d) => d.id === Number(tasiyici.dataset.dersId));
     if (!ders) return;
-    if (olay.target.closest(".menu-dugmesi")) dersFormunuAc(ders);
-    else dersTiklandi(ders);
+    if (olay.target.closest(".menu-dugmesi")) {
+        dersFormunuAc(ders);
+    } else {
+        // Sınav bloğuysa panelde o kalemin satırı da vurgulanır.
+        dersPaneliniAc(ders, tasiyici.dataset.kalemId ? Number(tasiyici.dataset.kalemId) : null);
+    }
+});
+
+// ============================================================
+// SAĞ PANEL
+// Panel bir kapsayıcıdır: içinde aynı anda tek bir "görünüm" gösterilir.
+// Şimdilik iki görünüm var: "bos" (ders seçili değil) ve "ders" (seçili dersin paneli).
+// İleride başka görünümler (ör. genel GPA) eklenebilir.
+// ============================================================
+
+const yanPanel = document.getElementById("yan-panel");
+const sekmeler = document.getElementById("sekmeler");
+const hesapOzeti = document.getElementById("hesap-ozeti");
+const kalemTablosu = document.getElementById("kalem-tablosu");
+const puanHatasi = document.getElementById("puan-hatasi");
+const notAlani = document.getElementById("ders-notlari");
+const notDurumu = document.getElementById("not-durumu");
+const bilgiIcerigi = document.getElementById("bilgi-icerigi");
+
+let seciliDersId = null;       // panelde açık olan dersin kimliği (yoksa null)
+let seciliSekme = "hesap";     // "hesap", "notlar" veya "bilgi"
+let notZamanlayici = null;     // yazılan notun bekleyen otomatik kaydı
+
+// Küçük yardımcı: bir HTML elemanı oluşturur.
+function eleman(etiket, sinif, yazi) {
+    const yeni = document.createElement(etiket);
+    if (sinif) yeni.className = sinif;
+    if (yazi != null) yeni.textContent = yazi;
+    return yeni;
+}
+
+function seciliDers() {
+    return dersler.find((ders) => ders.id === seciliDersId) || null;
+}
+
+function turBul(anahtar) {
+    return AYARLAR.degerlendirmeTurleri.find((tur) => tur.anahtar === anahtar) || { ad: anahtar, den_hali: anahtar };
+}
+
+// Panelde sadece adı verilen görünümü gösterir.
+function panelGorunumunuGoster(ad) {
+    yanPanel.querySelectorAll(".panel-gorunumu").forEach((gorunum) => {
+        gorunum.hidden = gorunum.dataset.gorunum !== ad;
+    });
+}
+
+// Seçili dersin takvimdeki bütün bloklarını (ve şerit etiketlerini) çerçeveyle belli eder.
+function seciliVurguyuGuncelle() {
+    izgara.querySelectorAll("[data-ders-id]").forEach((blok) => {
+        blok.classList.toggle("secili", Number(blok.dataset.dersId) === seciliDersId);
+    });
+}
+
+// Dersin panelini açar. kalemId verilirse (sınav bloğuna tıklandıysa) o kalemin satırı vurgulanır.
+function dersPaneliniAc(ders, kalemId = null) {
+    const dersDegisti = ders.id !== seciliDersId;
+    if (dersDegisti) {
+        notKaydiniBitir();      // önceki dersin yazılmakta olan notu kaybolmasın
+        seciliDersId = ders.id;
+        seciliSekme = "hesap";
+    }
+    if (kalemId != null) seciliSekme = "hesap";
+    dersPaneliniCiz(dersDegisti);
+    seciliVurguyuGuncelle();
+    if (kalemId != null) kalemSatiriniVurgula(kalemId);
+}
+
+function paneliKapat() {
+    notKaydiniBitir();
+    seciliDersId = null;
+    panelGorunumunuGoster("bos");
+    seciliVurguyuGuncelle();
+}
+
+// Dersler sunucudan yeniden yüklenince çağrılır: paneli yeni veriyle tazeler,
+// seçili ders silinmişse paneli kapatır.
+function paneliYenile() {
+    if (seciliDersId === null) return;
+    if (!seciliDers()) {
+        clearTimeout(notZamanlayici);
+        notZamanlayici = null;
+        seciliDersId = null;
+        panelGorunumunuGoster("bos");
+        return;
+    }
+    dersPaneliniCiz(false);
+}
+
+function sekmeyiGoster(ad) {
+    seciliSekme = ad;
+    sekmeler.querySelectorAll("button").forEach((dugme) => {
+        dugme.classList.toggle("secili", dugme.dataset.sekme === ad);
+    });
+    yanPanel.querySelectorAll(".sekme-icerigi").forEach((icerik) => {
+        icerik.hidden = icerik.dataset.sekme !== ad;
+    });
+}
+
+// Seçili dersin panelini baştan çizer.
+// notlariYukle: not alanı da dersin kayıtlı notuyla doldurulsun mu? (Aynı ders tazelenirken
+// doldurulmaz ki o sırada yazılmakta olan not ezilmesin.)
+function dersPaneliniCiz(notlariYukle) {
+    const ders = seciliDers();
+    panelGorunumunuGoster("ders");
+
+    document.getElementById("panel-renk").style.background = renkBul(ders.renk).kod;
+    document.getElementById("panel-kod").textContent = ders.kod;
+    const adYazisi = document.getElementById("panel-ad");
+    adYazisi.textContent = ders.ad || "";
+    adYazisi.hidden = !ders.ad;
+
+    const kunye = [`Kredi ${ders.kredi}`, `Hedef ${hedefHarf(ders) ? ders.hedef_not : "—"}`];
+    if (ders.devamsizlik_hakki != null) kunye.push(`Devamsızlık hakkı %${ders.devamsizlik_hakki}`);
+    document.getElementById("panel-kunye").textContent = kunye.join(" · ");
+
+    if (notlariYukle) {
+        notAlani.value = ders.notlar || "";
+        notDurumu.textContent = "";
+    }
+    sekmeyiGoster(seciliSekme);
+    kalemTablosunuCiz(ders);
+    hesabiCiz(ders);
+    bilgiyiCiz(ders);
+}
+
+// ---------- Sekme: Not hesabı ----------
+// Bütün dersler mutlak notlandırma ile hesaplanır; harf ölçeği app.py'deki NOT_OLCEGI'nden gelir.
+//
+// Puan girişi kuralı (app.py: YUZ_UZERINDEN_TURLER):
+//   Vize 1/2/3 ve Final : 0-100 üzerinden girilir, toplama katkısı = ağırlık × girilen / 100
+//   Diğer bütün kalemler: 0 ile kalemin ağırlığı arasında doğrudan puan girilir, katkısı = girilen değer
+
+// Bir harfin alt sınırını yuvarlama ayarına (app.py: ROUND_MODE) göre verir.
+// "none": yuvarlama yok, puan >= alt sınır olmalı. "nearest": 89.5, 90 sayılır.
+// Bütün harf karşılaştırmaları ve "gereken puan" hesapları bu eşiği kullanır.
+function etkinEsik(altSinir) {
+    return AYARLAR.roundMode === "nearest" ? altSinir - 0.5 : altSinir;
+}
+
+// Dersin hedef harfi (ölçekteki satırı). Seçilmemişse ya da hedef olamayacak bir değerse null.
+function hedefHarf(ders) {
+    return AYARLAR.notOlcegi.find((harf) => harf.harf === ders.hedef_not && harf.katsayi > 0) || null;
+}
+
+// Verilen ders puanının karşılık geldiği harf (50'nin altı F).
+function harfSeviyesi(puan) {
+    return AYARLAR.notOlcegi.find((harf) => puan >= etkinEsik(harf.alt_sinir))
+        || AYARLAR.notOlcegi[AYARLAR.notOlcegi.length - 1];
+}
+
+// Ekranda en fazla tek ondalık; tam sayıysa ondalık gösterilmez (85.0 yerine 85).
+// "En az" denilen değerler yukarı yuvarlanır ki yazılan puan gerçekten yetsin;
+// toplamlar aşağı yuvarlanır ki olduğundan yüksek görünmesin. (1e6: küsurat hatalarını temizler.)
+function yukariYuvarla(sayi) {
+    return String(Math.ceil(Math.round(sayi * 1e6) / 1e5) / 10);
+}
+
+function asagiYuvarla(sayi) {
+    return String(Math.floor(Math.round(sayi * 1e6) / 1e5) / 10);
+}
+
+// Kalemin puanı 100 üzerinden mi giriliyor (vize, final)?
+function yuzUzerindenMi(kalem) {
+    return AYARLAR.yuzUzerindenTurler.includes(kalem.tur);
+}
+
+// Kalemin puan alanına girilebilecek en büyük değer: vize/finalde 100, diğerlerinde kalemin ağırlığı.
+function puanSiniri(kalem) {
+    return yuzUzerindenMi(kalem) ? 100 : kalem.agirlik;
+}
+
+// Kalemin toplam ders puanına katkısı. Puan girilmemişse null.
+// Ağırlık sonradan girilmiş puanın altına indirildiyse katkı yeni ağırlıkla sınırlanır.
+function kalemKatkisi(kalem) {
+    if (kalem.alinan_puan == null) return null;
+    if (yuzUzerindenMi(kalem)) return kalem.agirlik * kalem.alinan_puan / 100;
+    return Math.min(kalem.alinan_puan, kalem.agirlik);
+}
+
+// Dersin not durumu: hesabın bütün ara değerleri burada, tek yerde hesaplanır.
+// Ders puanı 100'e kırpılmaz; ekstra kalemlerden alınan puan doğrudan eklenir.
+function notDurumunuHesapla(ders) {
+    const durum = {
+        kazanilan: 0,            // girilen kalemlerin katkıları toplamı (ekstra dahil)
+        girilenVar: false,       // en az bir kaleme puan girilmiş mi
+        kalanNormal: [],         // puanı girilmemiş normal kalemler
+        kalanNormalPuan: 0,      // bunlardan alınabilecek en fazla puan (ağırlıkları toplamı)
+        kalanEkstraPuan: 0,      // puanı girilmemiş ekstra kalemlerin ağırlıkları toplamı
+        normalToplam: 0,         // normal kalemlerin ağırlık toplamı (%100'den az ya da çok olabilir)
+    };
+    for (const kalem of ders.degerlendirmeler) {
+        if (!kalem.ekstra_puan) durum.normalToplam += kalem.agirlik;
+        const katki = kalemKatkisi(kalem);
+        if (katki !== null) {
+            durum.kazanilan += katki;
+            durum.girilenVar = true;
+        } else if (kalem.ekstra_puan) {
+            durum.kalanEkstraPuan += kalem.agirlik;
+        } else {
+            durum.kalanNormal.push(kalem);
+            durum.kalanNormalPuan += kalem.agirlik;
+        }
+    }
+    return durum;
+}
+
+// Hedefe göre sonuç kutusunun içeriğini hazırlar: { baslik, ek: [satırlar], duzenle }
+function sonucMesaji(ders, durum) {
+    if (ders.degerlendirmeler.length === 0) {
+        return { baslik: "Bu derse değerlendirme kalemi eklenmemiş.", ek: ["Kalemleri “Düzenle” ile ekleyebilirsin."], duzenle: true };
+    }
+    const hedef = hedefHarf(ders);
+    if (!hedef) {
+        return { baslik: "Bu dersin hedef harf notu seçilmemiş.", ek: ["Hedefini “Düzenle” ile seç."], duzenle: true };
+    }
+    // Hedefe ulaşmak için daha kaç puan gerekiyor?
+    const gereken = etkinEsik(hedef.alt_sinir) - durum.kazanilan;
+    if (gereken <= 0) return { baslik: "Hedefe ulaştın." };
+
+    // Girilecek normal kalem kalmadı.
+    if (durum.kalanNormal.length === 0) {
+        const ek = [];
+        if (durum.kalanEkstraPuan >= gereken) {
+            ek.push(`Kalan ekstra kalemlerden toplam en az ${yukariYuvarla(gereken)} puan alırsan hedefe ulaşırsın.`);
+        }
+        return { baslik: "Tüm kalemler girildi, hedefin altında kaldın.", ek };
+    }
+
+    // Kalan normal kalemlerin hepsinden tam puan alınsa bile yetmiyor.
+    if (gereken > durum.kalanNormalPuan) {
+        if (durum.kalanEkstraPuan > 0 && gereken <= durum.kalanNormalPuan + durum.kalanEkstraPuan) {
+            return {
+                baslik: "Ekstra olmadan bu hedefe ulaşmak mümkün görünmüyor.",
+                ek: [`Ekstra puanları da alırsan kalan kalemlerden toplam en az ${yukariYuvarla(gereken - durum.kalanEkstraPuan)} puan yeterli.`],
+            };
+        }
+        return { baslik: "Bu hedefe ulaşmak mümkün görünmüyor." };
+    }
+
+    // Tek kalem kaldı.
+    if (durum.kalanNormal.length === 1) {
+        const kalem = durum.kalanNormal[0];
+        const tur = turBul(kalem.tur);
+        if (yuzUzerindenMi(kalem)) {
+            // Vize/final: gereken puan 100 üzerinden söylenir.
+            return { baslik: `${tur.den_hali} en az ${yukariYuvarla(gereken / kalem.agirlik * 100)} almalısın.` };
+        }
+        return { baslik: `${tur.ad} için en az ${yukariYuvarla(gereken)} puan gerekiyor (${kalem.agirlik} üzerinden).` };
+    }
+
+    // Birden fazla kalem kaldı: toplam puan olarak söylenir.
+    return {
+        baslik: `Kalan kalemlerden toplam en az ${yukariYuvarla(gereken)} puan almalısın.`,
+        ek: [
+            `Alınabilecek en fazla: ${asagiYuvarla(durum.kalanNormalPuan)} puan`,
+            durum.kalanNormal.map((kalem) => `${turBul(kalem.tur).ad} %${kalem.agirlik}`).join(", "),
+        ],
+    };
+}
+
+// Puan alanına yazılanı sayıya çevirir. Nokta da virgül de kabul edilir ("7,7" = 7.7),
+// en fazla 2 ondalık basamak. Boşsa null (henüz alınmadı), geçersizse NaN döner.
+function puaniCoz(yazi) {
+    yazi = yazi.trim();
+    if (yazi === "") return null;
+    if (!/^\d+([.,]\d{1,2})?$/.test(yazi)) return NaN;
+    return Number(yazi.replace(",", "."));
+}
+
+// Kalem listesi: her satırda solda kalem (türü, küçük gri ağırlığı, varsa "ekstra" etiketi),
+// sağda puan alanı ve yanında girilebilecek en büyük değer ("/ 100" ya da "/ 10").
+function kalemTablosunuCiz(ders) {
+    kalemTablosu.replaceChildren();
+    mesajGoster(puanHatasi, "");
+    kalemTablosu.hidden = ders.degerlendirmeler.length === 0;
+    if (kalemTablosu.hidden) return;
+
+    const govde = kalemTablosu.createTBody();
+    for (const kalem of ders.degerlendirmeler) {
+        const satir = govde.insertRow();
+        satir.dataset.kalemId = kalem.id;
+
+        const adHucresi = satir.insertCell();
+        adHucresi.textContent = turBul(kalem.tur).ad;
+        adHucresi.appendChild(eleman("span", "kalem-agirligi", `%${kalem.agirlik}`));
+        if (kalem.ekstra_puan) adHucresi.appendChild(eleman("span", "ekstra-etiketi", "ekstra"));
+
+        const sinir = puanSiniri(kalem);
+        const girdi = eleman("input");
+        girdi.type = "text";
+        girdi.inputMode = "decimal";   // telefonda sayı klavyesi; tarayıcının artır/azalt okları yok
+        girdi.autocomplete = "off";
+        girdi.placeholder = "—";
+        girdi.value = kalem.alinan_puan ?? "";
+        girdi.setAttribute("aria-label", `${turBul(kalem.tur).ad}: aldığım puan (${sinir} üzerinden)`);
+        // Ağırlık sonradan girilmiş puanın altına indirildiyse alan kırmızı görünür.
+        girdi.classList.toggle("eksik", kalem.alinan_puan != null && kalem.alinan_puan > sinir);
+        // "change": değer değiştiyse alandan çıkınca (ya da Enter'a basınca) çalışır.
+        girdi.addEventListener("change", () => puaniKaydet(kalem.id, girdi));
+
+        const puanHucresi = satir.insertCell();
+        puanHucresi.className = "sayi";
+        puanHucresi.append(girdi, eleman("span", "puan-siniri", `/ ${sinir}`));
+    }
+}
+
+// Girilen puanı kontrol edip kaydeder (boş = henüz alınmadı), ardından hesabı yeniler.
+// Geçersiz değer (harf, negatif, sınırın üstü, 2'den fazla ondalık) kaydedilmez, alan kırmızı olur.
+async function puaniKaydet(kalemId, girdi) {
+    const kalem = seciliDers()?.degerlendirmeler.find((k) => k.id === kalemId);
+    if (!kalem) return;
+    const sinir = puanSiniri(kalem);
+    const puan = puaniCoz(girdi.value);
+    const gecersiz = puan !== null && !(puan >= 0 && puan <= sinir);
+    girdi.classList.toggle("eksik", gecersiz);
+    if (gecersiz) {
+        mesajGoster(puanHatasi, `${turBul(kalem.tur).ad}: puan 0 ile ${sinir} arasında bir sayı olmalı (en fazla 2 ondalık). Kaydedilmedi.`);
+        return;
+    }
+    try {
+        await istekGonder("PUT", `/api/degerlendirmeler/${kalemId}/puan`, { alinan_puan: puan });
+    } catch (hata) {
+        girdi.classList.add("eksik");
+        mesajGoster(puanHatasi, hata.message);
+        return;
+    }
+    mesajGoster(puanHatasi, "");
+    // Kayıt başarılı: eldeki veriyi güncelle, alanı sade biçimde göster ("7,7" -> "7.7") ve sonucu
+    // yeniden hesapla (liste yeniden çizilmez, böylece bir sonraki alana geçmiş imleç kaybolmaz).
+    kalem.alinan_puan = puan;
+    girdi.value = puan ?? "";
+    if (seciliDers()) hesabiCiz(seciliDers());
+}
+
+// Not hesabının sonucunu çizer: tek bir sonuç kutusu ve (gerekirse) altında küçük bir not.
+function hesabiCiz(ders) {
+    const durum = notDurumunuHesapla(ders);
+    hesapOzeti.replaceChildren();
+
+    const sonuc = sonucMesaji(ders, durum);
+    const kutu = eleman("div", "hesap-sonucu");
+    kutu.appendChild(eleman("strong", "", sonuc.baslik));
+    for (const yazi of sonuc.ek || []) kutu.appendChild(eleman("p", "", yazi));
+    if (sonuc.duzenle) {
+        const dugme = eleman("button", "dugme", "Düzenle");
+        dugme.type = "button";
+        dugme.addEventListener("click", () => dersFormunuAc(ders));
+        kutu.appendChild(dugme);
+    }
+    // Kutunun altındaki küçük gri satır: şu ana kadar kazanılan puan ve karşılık geldiği harf.
+    if (durum.girilenVar) {
+        kutu.appendChild(eleman("p", "kucuk-not",
+            `Şu an: ${asagiYuvarla(durum.kazanilan)} puan (${harfSeviyesi(durum.kazanilan).harf} seviyesi)`));
+    }
+    hesapOzeti.appendChild(kutu);
+
+    if (ders.degerlendirmeler.length > 0 && durum.normalToplam < 100) {
+        hesapOzeti.appendChild(eleman("p", "kucuk-not",
+            `Değerlendirme toplamı %${asagiYuvarla(durum.normalToplam)}, eksik kalem olabilir.`));
+    }
+}
+
+// Sınav bloğundan gelindiğinde o kalemin satırını kısa süre vurgular.
+function kalemSatiriniVurgula(kalemId) {
+    const satir = kalemTablosu.querySelector(`tr[data-kalem-id="${kalemId}"]`);
+    if (!satir) return;
+    satir.classList.remove("vurgulu");
+    void satir.offsetWidth;   // animasyon baştan başlasın diye
+    satir.classList.add("vurgulu");
+    satir.scrollIntoView?.({ block: "nearest" });
+    setTimeout(() => satir.classList.remove("vurgulu"), 1600);
+}
+
+// ---------- Sekme: Notlar ----------
+// Yazmayı bıraktıktan yaklaşık 1 saniye sonra kendiliğinden kaydedilir.
+
+async function notlariKaydet() {
+    clearTimeout(notZamanlayici);
+    notZamanlayici = null;
+    const ders = seciliDers();
+    if (!ders) return;
+    const dersId = ders.id;
+    ders.notlar = notAlani.value;   // başka derse geçip geri dönünce de görünsün
+    let basarili = false;
+    try {
+        // keepalive: sayfa kapanırken gönderilen son kayıt da yerine ulaşsın.
+        const yanit = await fetch(`/api/dersler/${dersId}/notlar`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ notlar: ders.notlar }),
+            keepalive: true,
+        });
+        basarili = yanit.ok;
+    } catch {
+        basarili = false;
+    }
+    // Bu arada başka derse geçildiyse ya da yeniden yazılmaya başlandıysa göstergeye dokunma.
+    if (seciliDersId === dersId && notZamanlayici === null) {
+        notDurumu.textContent = basarili ? "Kaydedildi" : "Kaydedilemedi, sunucu çalışıyor mu?";
+    }
+}
+
+// Bekleyen bir not kaydı varsa hemen yapar (ders değişirken, panel ya da sayfa kapanırken).
+function notKaydiniBitir() {
+    if (notZamanlayici !== null) notlariKaydet();
+}
+
+notAlani.addEventListener("input", () => {
+    notDurumu.textContent = "Yazılıyor...";
+    clearTimeout(notZamanlayici);
+    notZamanlayici = setTimeout(notlariKaydet, 1000);
+});
+window.addEventListener("pagehide", notKaydiniBitir);
+
+// ---------- Sekme: Bilgi (salt okunur özet) ----------
+
+// "2026-11-15" -> "15.11.2026"
+function tarihiGoster(tarih) {
+    return tarih.split("-").reverse().join(".");
+}
+
+function bilgiyiCiz(ders) {
+    bilgiIcerigi.replaceChildren();
+
+    function bolum(baslik, satirlar) {
+        bilgiIcerigi.appendChild(eleman("h3", "", baslik));
+        const liste = eleman("ul");
+        for (const yazi of satirlar) liste.appendChild(eleman("li", "", yazi));
+        bilgiIcerigi.appendChild(liste);
+    }
+
+    bolum("Oturumlar", ders.oturumlar.map((oturum) => {
+        const parcalar = [`${AYARLAR.gunler[oturum.gun]} ${oturum.baslangic}-${oturum.bitis}`, oturum.derslik];
+        if (oturum.tur) parcalar.push(oturum.tur);
+        return parcalar.join(" · ");
+    }));
+
+    bolum("Değerlendirme kalemleri", ders.degerlendirmeler.length === 0 ? ["Kalem eklenmemiş."]
+        : ders.degerlendirmeler.map((kalem) => {
+            const parcalar = [turBul(kalem.tur).ad, `%${kalem.agirlik}`];
+            if (kalem.tarih) parcalar.push(tarihiGoster(kalem.tarih));
+            if (kalem.saat) parcalar.push(kalem.saat + (kalem.bitis_saat ? `-${kalem.bitis_saat}` : ""));
+            if (kalem.ekstra_puan) parcalar.push("ekstra");
+            return parcalar.join(" · ");
+        }));
+
+    bolum("AKTS", [ders.akts != null ? String(ders.akts) : "—"]);
+}
+
+// ---------- Panel olayları ----------
+
+document.getElementById("panel-kapat").addEventListener("click", paneliKapat);
+document.getElementById("bilgi-duzenle").addEventListener("click", () => {
+    if (seciliDers()) dersFormunuAc(seciliDers());
+});
+sekmeler.addEventListener("click", (olay) => {
+    const dugme = olay.target.closest("button[data-sekme]");
+    if (dugme) sekmeyiGoster(dugme.dataset.sekme);
 });
 
 // ============================================================

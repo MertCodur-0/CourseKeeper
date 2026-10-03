@@ -59,8 +59,57 @@
             <button type="button" class="ekle-dugmesi" id="ekle-dugmesi" title="Ders ekle" aria-label="Ders ekle">+</button>
         </div>
 
-        <!-- SAĞ: şimdilik boş panel (ileride sekmeli panel olacak). -->
-        <aside class="yan-panel"></aside>
+        <!-- SAĞ: panel. Bir kapsayıcıdır: içinde aynı anda tek bir "görünüm" gösterilir.
+             Şimdilik iki görünüm var (boş durum ve ders paneli); ileride yenileri eklenebilir. -->
+        <aside class="yan-panel" id="yan-panel">
+
+            <!-- Görünüm: hiçbir ders seçili değil -->
+            <div class="panel-gorunumu panel-bos" data-gorunum="bos">
+                Bir ders seçmek için takvimde bloğuna tıkla
+            </div>
+
+            <!-- Görünüm: seçili dersin paneli (içeriğini JavaScript doldurur) -->
+            <section class="panel-gorunumu ders-paneli" data-gorunum="ders" hidden>
+                <header class="panel-baslik">
+                    <span class="renk-noktasi" id="panel-renk"></span>
+                    <div class="panel-adlar">
+                        <h2 id="panel-kod"></h2>
+                        <p id="panel-ad"></p>
+                    </div>
+                    <button type="button" class="kapat" id="panel-kapat" title="Paneli kapat" aria-label="Paneli kapat">×</button>
+                </header>
+                <!-- Kredi, hedef harf notu, devamsızlık hakkı -->
+                <p class="panel-kunye" id="panel-kunye"></p>
+
+                <nav class="sekmeler" id="sekmeler">
+                    <button type="button" data-sekme="hesap">Not hesabı</button>
+                    <button type="button" data-sekme="notlar">Notlar</button>
+                    <button type="button" data-sekme="bilgi">Bilgi</button>
+                </nav>
+
+                <!-- Sekme: Not hesabı -->
+                <div class="sekme-icerigi" data-sekme="hesap">
+                    <!-- Sonuç kutusu ve (varsa) küçük not -->
+                    <div id="hesap-ozeti"></div>
+                    <!-- Kalem listesi: her satırda kalem ve aldığım puan -->
+                    <table class="panel-tablosu" id="kalem-tablosu"></table>
+                    <p class="mesaj hata" id="puan-hatasi" hidden></p>
+                </div>
+
+                <!-- Sekme: Notlar (yazarken otomatik kaydedilir) -->
+                <div class="sekme-icerigi" data-sekme="notlar" hidden>
+                    <textarea class="ders-notlari" id="ders-notlari" placeholder="Bu dersle ilgili notların..." aria-label="Ders notları"></textarea>
+                    <span class="not-durumu" id="not-durumu"></span>
+                </div>
+
+                <!-- Sekme: Bilgi (salt okunur özet) -->
+                <div class="sekme-icerigi" data-sekme="bilgi" hidden>
+                    <button type="button" class="dugme" id="bilgi-duzenle">Düzenle</button>
+                    <div id="bilgi-icerigi"></div>
+                </div>
+            </section>
+
+        </aside>
 
     </main>
 
@@ -179,6 +228,7 @@
                 <div class="satir degerlendirme-satiri satir-basliklari">
                     <span>Tür <b class="yildiz">*</b></span>
                     <span>Ağırlık % <b class="yildiz">*</b></span>
+                    <span title="İşaretli kalem normal toplama değil, ekstra (bonus) toplamına sayılır.">Ekstra puan</span>
                     <span>Tarih</span>
                     <span>Başlangıç</span>
                     <span>Bitiş</span>
@@ -241,7 +291,8 @@
                 <option value="{{ tur.anahtar }}">{{ tur.ad }}</option>
                 {% endfor %}
             </select>
-            <input type="number" data-alan="agirlik" data-zorunlu min="0" step="any" placeholder="40" aria-label="Ağırlık yüzdesi">
+            <input type="number" data-alan="agirlik" data-zorunlu min="0" max="{{ en_fazla_agirlik }}" step="any" placeholder="40" aria-label="Ağırlık yüzdesi">
+            <input type="checkbox" data-alan="ekstra_puan" aria-label="Ekstra puan" title="Ekstra (bonus) puan: normal toplama sayılmaz">
             <input type="date" data-alan="tarih" aria-label="Tarih">
             <select data-alan="saat" data-saat="asagi" aria-label="Başlangıç saati">
                 <option value="">—</option>
