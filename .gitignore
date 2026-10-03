@@ -1,0 +1,14 @@
+# Gizli ayarlar (API anahtarı burada durur)
+.env
+
+# Veritabanı dosyası
+*.db
+*.db-journal
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
