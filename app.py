@@ -4,10 +4,20 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
+from werkzeug.exceptions import RequestEntityTooLarge
+
+import syllabus
+from syllabus import SyllabusHatasi
 
 # Veritabanı dosyası proje klasöründe durur.
 PROJE_KLASORU = Path(__file__).parent
 VERITABANI_DOSYASI = PROJE_KLASORU / "derstakip.db"
+
+# Gizli ayarlar (GEMINI_API_KEY, GEMINI_MODEL) bu dosyadan okunur. Anahtar koda yazılmaz.
+ENV_DOSYASI = PROJE_KLASORU / ".env"
+
+# Syllabus olarak kabul edilen en büyük dosya.
+SYLLABUS_EN_FAZLA_MB = 20
 
 # 5000 portunu Mac'te AirPlay kullandığı için 5001'i seçtik.
 PORT = 5001
@@ -106,17 +116,33 @@ DEGERLENDIRME_TURLERI = [
 ]
 DIGER_TURLERI = ["diger1", "diger2", "diger3"]
 
-# Eski sürümdeki türlerin yeni karşılıkları (sadece veritabanı güncellenirken kullanılır).
-# Listelenmeyen türlerin anahtarı aynı kaldı (final, quiz, odev, proje).
-ESKI_TUR_KARSILIKLARI = {
+# Numarasız genel türlerin (eski sürümden ya da syllabus'tan gelen) listedeki karşılıkları.
+# Burada olmayan türlerin anahtarı aynıdır (final, quiz, odev, proje, lab).
+TUR_ADAYLARI = {
     "vize": ["vize1", "vize2", "vize3"],
     "diger": [],   # doğrudan boş "Diğer" yerlerine gider
 }
+
+
+def bos_tur_bul(tur, dolu_turler):
+    """Kalem için derste henüz kullanılmamış uygun türü bulur.
+
+    Önce kalemin kendi türü denenir (vize için Vize 1, 2, 3), doluysa boş "Diğer" yerleri.
+    Hiç yer kalmadıysa None döner.
+    """
+    gecerli_turler = [satir["anahtar"] for satir in DEGERLENDIRME_TURLERI]
+    adaylar = TUR_ADAYLARI.get(tur, [tur]) + DIGER_TURLERI
+    return next(
+        (aday for aday in adaylar if aday in gecerli_turler and aday not in dolu_turler), None
+    )
+
 
 # "09:00" gibi tam saat biçimi (dakika hep 00).
 TAM_SAAT_KALIBI = re.compile(r"^([01]\d|2[0-3]):00$")
 
 app = Flask(__name__)
+# Bundan büyük istekler baştan reddedilir (dosya + küçük bir pay).
+app.config["MAX_CONTENT_LENGTH"] = (SYLLABUS_EN_FAZLA_MB + 1) * 1024 * 1024
 
 
 def bu_haftanin_gunleri(bugun):
@@ -162,6 +188,7 @@ def veritabani_hazirla():
             renk              TEXT NOT NULL,      -- RENKLER listesindeki anahtar
             notlar            TEXT,               -- formda yok; ileride sağ panelde kullanılacak
             hedef_not         TEXT,               -- "AA", "BA" ... (eski derslerde boş olabilir)
+            devamsizlik_metni TEXT,               -- formda yok: syllabus'ta yüzde olarak yazmayan devamsızlık kuralı
             sinav_rengi       TEXT                -- sınav bloklarının rengi (RENKLER anahtarı)
         );
 
@@ -180,7 +207,7 @@ def veritabani_hazirla():
         CREATE TABLE IF NOT EXISTS degerlendirmeler (
             id         INTEGER PRIMARY KEY,
             ders_id    INTEGER NOT NULL REFERENCES dersler(id) ON DELETE CASCADE,
-            ad         TEXT NOT NULL,             -- eski sürümden kalan ad; formda yok, yeni kalemde boş
+            ad         TEXT NOT NULL,             -- formda yok: kalemin eski sürümdeki ya da syllabus'taki adı
             tur        TEXT NOT NULL,             -- DEGERLENDIRME_TURLERI listesindeki anahtar
             agirlik    REAL NOT NULL,             -- yüzde, ör. 40
             tarih      TEXT,                      -- "2026-11-15"
@@ -209,6 +236,7 @@ def veritabani_guncelle(baglanti):
     """
     sutun_yoksa_ekle(baglanti, "dersler", "hedef_not")
     sutun_yoksa_ekle(baglanti, "dersler", "sinav_rengi")
+    sutun_yoksa_ekle(baglanti, "dersler", "devamsizlik_metni")
     sutun_yoksa_ekle(baglanti, "degerlendirmeler", "bitis_saat")
 
     silinenler = []
@@ -217,7 +245,6 @@ def veritabani_guncelle(baglanti):
         # "Alıştırma" oturum türü kalktı.
         baglanti.execute("UPDATE oturumlar SET tur = 'teori' WHERE tur = 'alistirma'")
 
-        gecerli_turler = [tur["anahtar"] for tur in DEGERLENDIRME_TURLERI]
         for ders in baglanti.execute("SELECT id, kod, renk, sinav_rengi FROM dersler").fetchall():
             # Eski türleri yeni listeye taşı ve her türün derste bir kez geçmesini sağla.
             # Kalemin önce kendi türü denenir, doluysa boş "Diğer" yerleri.
@@ -227,11 +254,7 @@ def veritabani_guncelle(baglanti):
                 (ders["id"],),
             ).fetchall()
             for kalem in kalemler:
-                adaylar = ESKI_TUR_KARSILIKLARI.get(kalem["tur"], [kalem["tur"]]) + DIGER_TURLERI
-                yeni_tur = next(
-                    (aday for aday in adaylar if aday in gecerli_turler and aday not in dolu_turler),
-                    None,
-                )
+                yeni_tur = bos_tur_bul(kalem["tur"], dolu_turler)
                 if yeni_tur is None:
                     baglanti.execute("DELETE FROM degerlendirmeler WHERE id = ?", (kalem["id"],))
                     silinenler.append(f'{ders["kod"]}: "{kalem["ad"]}" (tür: {kalem["tur"]})')
@@ -262,7 +285,7 @@ def dersleri_getir(baglanti):
             (ders["id"],),
         )]
         ders["degerlendirmeler"] = [dict(satir) for satir in baglanti.execute(
-            "SELECT id, tur, agirlik, tarih, saat, bitis_saat FROM degerlendirmeler"
+            "SELECT id, ad, tur, agirlik, tarih, saat, bitis_saat FROM degerlendirmeler"
             " WHERE ders_id = ? ORDER BY id",
             (ders["id"],),
         )]
@@ -285,14 +308,12 @@ def siradaki_renk(baglanti, haric=None):
     return min(adaylar, key=lambda anahtar: kullanim[anahtar])
 
 
-def alt_satirlari_esitle(baglanti, tablo, sutunlar, ders_id, satirlar, yeni_satir_ekleri=None):
+def alt_satirlari_esitle(baglanti, tablo, sutunlar, ders_id, satirlar):
     """Bir dersin oturumlarını (veya değerlendirme kalemlerini) formdaki haline getirir.
 
     Var olan satır güncellenir (kimliği değişmez), yeni satır eklenir,
     formdan çıkarılmış satır silinir.
-    yeni_satir_ekleri: sadece yeni satır eklenirken yazılan sabit değerler ({sütun: değer}).
     """
-    ekler = yeni_satir_ekleri or {}
     mevcut = {satir["id"] for satir in baglanti.execute(
         f"SELECT id FROM {tablo} WHERE ders_id = ?", (ders_id,)
     )}
@@ -304,11 +325,10 @@ def alt_satirlari_esitle(baglanti, tablo, sutunlar, ders_id, satirlar, yeni_sati
             baglanti.execute(f"UPDATE {tablo} SET {atamalar} WHERE id = ?", degerler + [satir["id"]])
             kalanlar.add(satir["id"])
         else:
-            eklenen_sutunlar = ["ders_id"] + sutunlar + list(ekler)
-            soru_isaretleri = ", ".join("?" for _ in eklenen_sutunlar)
+            soru_isaretleri = ", ".join("?" for _ in sutunlar)
             baglanti.execute(
-                f"INSERT INTO {tablo} ({', '.join(eklenen_sutunlar)}) VALUES ({soru_isaretleri})",
-                [ders_id] + degerler + list(ekler.values()),
+                f"INSERT INTO {tablo} (ders_id, {', '.join(sutunlar)}) VALUES (?, {soru_isaretleri})",
+                [ders_id] + degerler,
             )
     for silinecek in mevcut - kalanlar:
         baglanti.execute(f"DELETE FROM {tablo} WHERE id = ?", (silinecek,))
@@ -318,14 +338,15 @@ def dersi_kaydet(baglanti, ders, ders_id=None):
     """Dersi ekler (ders_id yoksa) veya günceller. Dersin kimliğini döndürür.
 
     "notlar" sütununa dokunulmaz (formda yok, mevcut değer aynen kalır).
+    "devamsizlik_metni" sadece ders eklenirken yazılır (syllabus'tan gelir), güncellemede aynen kalır.
     """
     degerler = [ders["kod"], ders["ad"], ders["kredi"], ders["akts"],
                 ders["devamsizlik_hakki"], ders["renk"], ders["hedef_not"]]
     if ders_id is None:
         imlec = baglanti.execute(
-            "INSERT INTO dersler (kod, ad, kredi, akts, devamsizlik_hakki, renk, hedef_not)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?)",
-            degerler,
+            "INSERT INTO dersler (kod, ad, kredi, akts, devamsizlik_hakki, renk, hedef_not,"
+            " devamsizlik_metni) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            degerler + [ders["devamsizlik_metni"]],
         )
         ders_id = imlec.lastrowid
     else:
@@ -338,9 +359,8 @@ def dersi_kaydet(baglanti, ders, ders_id=None):
                          ["gun", "baslangic", "bitis", "derslik", "tur"],
                          ders_id, ders["oturumlar"])
     alt_satirlari_esitle(baglanti, "degerlendirmeler",
-                         ["tur", "agirlik", "tarih", "saat", "bitis_saat"],
-                         ders_id, ders["degerlendirmeler"],
-                         yeni_satir_ekleri={"ad": ""})
+                         ["ad", "tur", "agirlik", "tarih", "saat", "bitis_saat"],
+                         ders_id, ders["degerlendirmeler"])
 
     # Sınav rengi: dersin ilk tarihli kalemi eklenince otomatik atanır ve dersle saklanır.
     # (Ders rengi sonradan sınav rengiyle aynı yapıldıysa sınav rengi yenilenir.)
@@ -456,7 +476,9 @@ def dersi_dogrula(veri):
         if bitis_saat is not None:
             if saat is None or not TAM_SAAT_KALIBI.match(bitis_saat) or bitis_saat <= saat:
                 return None, "Değerlendirme bitiş saati başlangıçtan sonra olmalı."
-        degerlendirmeler.append({"id": satir_kimligi(kalem), "tur": tur, "agirlik": agirlik,
+        # "ad" formda görünmez; satırla birlikte taşınır (eski sürümdeki ya da syllabus'taki ad).
+        degerlendirmeler.append({"id": satir_kimligi(kalem), "ad": metin(kalem.get("ad")),
+                                 "tur": tur, "agirlik": agirlik,
                                  "tarih": tarih, "saat": saat, "bitis_saat": bitis_saat})
 
     renk = metin(veri.get("renk"))
@@ -471,10 +493,180 @@ def dersi_dogrula(veri):
         "devamsizlik_hakki": devamsizlik_hakki,
         "renk": renk,
         "hedef_not": hedef_not,
+        "devamsizlik_metni": metin(veri.get("devamsizlik_metni")) or None,
         "oturumlar": oturumlar,
         "degerlendirmeler": degerlendirmeler,
     }
     return ders, None
+
+
+# ============================================================
+# SYLLABUS: okunan veriyi ders formuna çevirme
+# ============================================================
+
+def dosya_turunu_bul(icerik):
+    """Dosyanın türünü ilk baytlarından anlar (uzantıya güvenmez). Desteklenmiyorsa None."""
+    if icerik.startswith(b"%PDF"):
+        return "application/pdf"
+    if icerik.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if icerik.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    return None
+
+
+def isaret_ekle(isaretler, alan, aciklama):
+    """Formda sarı gösterilecek alanı ve nedenini kaydeder (bir alanın birden çok nedeni olabilir)."""
+    isaretler[alan] = f"{isaretler[alan]}; {aciklama}" if alan in isaretler else aciklama
+
+
+def syllabus_sayisi(deger, en_fazla=None):
+    """Syllabus'tan gelen sayıyı kontrol eder; sayı değilse, negatifse ya da sınırı aşıyorsa None."""
+    if isinstance(deger, bool) or not isinstance(deger, (int, float)):
+        return None
+    if deger < 0 or (en_fazla is not None and deger > en_fazla):
+        return None
+    return deger
+
+
+def syllabus_saati(deger, yon):
+    """Syllabus'tan gelen saati formdaki tam saat listesine uydurur. (saat, açıklama) döndürür.
+
+    yon "asagi": başlangıç, aşağı yuvarlanır (09:30 -> 09:00).
+    yon "yukari": bitiş, yukarı yuvarlanır (10:20 -> 11:00).
+    Yuvarlandıysa ya da takvim saatleri dışındaysa açıklama dolu döner (formda sarı görünür).
+    """
+    yazi = metin(deger)
+    eslesme = re.match(r"^(\d{1,2})[:.](\d{2})$", yazi)
+    if not eslesme or int(eslesme[1]) > 23 or int(eslesme[2]) > 59:
+        return None, None
+    saat, dakika = int(eslesme[1]), int(eslesme[2])
+    aciklamalar = []
+    if dakika != 0:
+        if yon == "yukari":
+            saat = min(saat + 1, 23)
+        aciklamalar.append(f"saat yuvarlandı (belgede {yazi})")
+    en_erken, en_gec = (ILK_SAAT, SON_SAAT - 1) if yon == "asagi" else (ILK_SAAT + 1, SON_SAAT)
+    if not en_erken <= saat <= en_gec:
+        aciklamalar.append(f"takvim saatleri ({ILK_SAAT:02d}:00-{SON_SAAT:02d}:00) dışında")
+    return f"{saat:02d}:00", "; ".join(aciklamalar) or None
+
+
+def syllabus_forma_cevir(ham):
+    """Parser'ın döndürdüğü veriyi (syllabus.CIKTI_SEMASI) ders formunun beklediği biçime çevirir.
+
+    (ders, uyarilar) döndürür. ders, elle ekleme formunu ön doldurmak için kullanılır;
+    kaydedilirken elle girişle aynı doğrulamadan (dersi_dogrula) geçer.
+    Dersteki ve satırlardaki "isaretler" sözlüğü: {alan adı: formda sarı gösterilme nedeni}.
+    Bilgi uydurulmaz: bulunamayan ya da geçersiz gelen alan boş bırakılır.
+    """
+    def liste(deger):
+        return deger if isinstance(deger, list) else []
+
+    def emin_olmayanlar(satir):
+        return [alan for alan in liste(satir.get("emin_olmayanlar")) if isinstance(alan, str)]
+
+    ders = {
+        "kod": metin(ham.get("kod")) or None,
+        "ad": metin(ham.get("ad")) or None,
+        "kredi": syllabus_sayisi(ham.get("kredi")),
+        "akts": syllabus_sayisi(ham.get("akts")),
+        "devamsizlik_hakki": syllabus_sayisi(ham.get("devamsizlik_yuzde"), en_fazla=100),
+        "devamsizlik_metni": metin(ham.get("devamsizlik_metni")) or None,
+        "oturumlar": [],
+        "degerlendirmeler": [],
+        "isaretler": {},
+    }
+    # Modelin emin olmadığı (ve dolu gelen) alanlar sarı işaretlenir.
+    form_alanlari = {"devamsizlik_yuzde": "devamsizlik_hakki"}
+    for alan in emin_olmayanlar(ham):
+        alan = form_alanlari.get(alan, alan)
+        if ders.get(alan) is not None and alan in ("kod", "ad", "kredi", "akts", "devamsizlik_hakki"):
+            isaret_ekle(ders["isaretler"], alan, "model emin değil")
+
+    oturum_turleri = [tur["anahtar"] for tur in OTURUM_TURLERI]
+    for ham_oturum in liste(ham.get("oturumlar")):
+        if not isinstance(ham_oturum, dict):
+            continue
+        gun_adi = metin(ham_oturum.get("gun"))
+        baslangic, baslangic_notu = syllabus_saati(ham_oturum.get("baslangic"), "asagi")
+        bitis, bitis_notu = syllabus_saati(ham_oturum.get("bitis"), "yukari")
+        oturum = {
+            "gun": syllabus.GUN_ADLARI.index(gun_adi) if gun_adi in syllabus.GUN_ADLARI else None,
+            "baslangic": baslangic,
+            "bitis": bitis,
+            "derslik": metin(ham_oturum.get("derslik")) or None,
+            "tur": ham_oturum.get("tur") if ham_oturum.get("tur") in oturum_turleri else None,
+            "isaretler": {},
+        }
+        # Hiçbir bilgisi okunamamış satırı forma ekleme.
+        if all(oturum[alan] is None for alan in ("gun", "baslangic", "bitis", "derslik")):
+            continue
+        if baslangic_notu:
+            isaret_ekle(oturum["isaretler"], "baslangic", baslangic_notu)
+        if bitis_notu:
+            isaret_ekle(oturum["isaretler"], "bitis", bitis_notu)
+        for alan in emin_olmayanlar(ham_oturum):
+            if alan in ("gun", "baslangic", "bitis", "derslik", "tur") and oturum[alan] is not None:
+                isaret_ekle(oturum["isaretler"], alan, "model emin değil")
+        ders["oturumlar"].append(oturum)
+
+    # Değerlendirme kalemleri: genel tür (vize, quiz...) formdaki sabit listeye yerleştirilir.
+    tur_adlari = {tur["anahtar"]: tur["ad"] for tur in DEGERLENDIRME_TURLERI}
+    dolu_turler = set()
+    sigmayanlar = []
+    for ham_kalem in liste(ham.get("degerlendirmeler")):
+        if not isinstance(ham_kalem, dict):
+            continue
+        ad = metin(ham_kalem.get("ad"))
+        agirlik = syllabus_sayisi(ham_kalem.get("agirlik"))
+        genel_tur = ham_kalem.get("tur") if ham_kalem.get("tur") in syllabus.KALEM_TURLERI else "diger"
+        tur = bos_tur_bul(genel_tur, dolu_turler)
+        if tur is None:
+            sigmayanlar.append(f"{ad or genel_tur}" + (f" (%{agirlik:g})" if agirlik is not None else ""))
+            continue
+        dolu_turler.add(tur)
+
+        tarih = metin(ham_kalem.get("tarih"))
+        saat, saat_notu = syllabus_saati(ham_kalem.get("baslangic"), "asagi")
+        bitis_saat, bitis_notu = syllabus_saati(ham_kalem.get("bitis"), "yukari")
+        if saat is None:
+            bitis_saat, bitis_notu = None, None   # bitiş, başlangıç olmadan anlamsız
+        kalem = {
+            "ad": ad,
+            "tur": tur,
+            "agirlik": agirlik,
+            "tarih": tarih if tarih_gecerli_mi(tarih) else None,
+            "saat": saat,
+            "bitis_saat": bitis_saat,
+            "isaretler": {},
+        }
+        # Kalem kendi türüne değil bir "Diğer" yerine konduysa belgedeki adı not olarak göster.
+        if tur in DIGER_TURLERI and ad:
+            isaret_ekle(kalem["isaretler"], "tur", f'belgede "{ad}"')
+        if saat_notu:
+            isaret_ekle(kalem["isaretler"], "saat", saat_notu)
+        if bitis_notu:
+            isaret_ekle(kalem["isaretler"], "bitis_saat", bitis_notu)
+        form_alanlari = {"baslangic": "saat", "bitis": "bitis_saat"}
+        for alan in emin_olmayanlar(ham_kalem):
+            alan = form_alanlari.get(alan, alan)
+            if alan in ("tur", "agirlik", "tarih", "saat", "bitis_saat") and kalem[alan] is not None:
+                isaret_ekle(kalem["isaretler"], alan, "model emin değil")
+        ders["degerlendirmeler"].append(kalem)
+
+    uyarilar = []
+    if sigmayanlar:
+        uyarilar.append(
+            "Sığmayan kalemler (her tür derste bir kez kullanılabildiği için forma eklenemedi): "
+            + ", ".join(sigmayanlar)
+        )
+    bos_mu = (ders["kod"] is None and ders["ad"] is None and ders["kredi"] is None
+              and not ders["oturumlar"] and not ders["degerlendirmeler"])
+    if bos_mu:
+        raise SyllabusHatasi(
+            "Bu dosyada ders bilgisi bulunamadı. Dosyanın bir syllabus (ders izlencesi) olduğundan emin ol.")
+    return ders, uyarilar
 
 
 # ============================================================
@@ -504,6 +696,7 @@ def ana_sayfa():
             "gunler": GUNLER,
             "bugun": bugun.isoformat(),
             "degerlendirmeTurleri": DEGERLENDIRME_TURLERI,
+            "syllabusEnFazlaMB": SYLLABUS_EN_FAZLA_MB,
         },
     )
 
@@ -551,6 +744,47 @@ def api_ders_guncelle(ders_id):
         dersi_kaydet(baglanti, ders, ders_id)
     baglanti.close()
     return jsonify({"id": ders_id})
+
+
+# ============================================================
+# SYLLABUS API'si
+# ============================================================
+
+@app.route("/api/syllabus", methods=["POST"])
+def api_syllabus_oku():
+    """Yüklenen syllabus'u (PDF/PNG/JPG) okur, ders formunu ön dolduracak veriyi döndürür.
+
+    Hiçbir şey kaydetmez: ders ancak kullanıcı formu kontrol edip Kaydet'e basınca eklenir.
+    Dosya saklanmaz: içerik bellekte işlenir. (Büyük yüklemelerde Flask'ın kullandığı geçici
+    dosya da istek bitince kendiliğinden silinir.)
+    Her hata {"hata": mesaj} olarak döner; uygulama çökmez.
+    """
+    en_fazla = SYLLABUS_EN_FAZLA_MB * 1024 * 1024
+    boyut_mesaji = f"Dosya çok büyük. En fazla {SYLLABUS_EN_FAZLA_MB} MB'lık dosya yükleyebilirsin."
+    try:
+        dosya = request.files.get("dosya")
+        if dosya is None:
+            raise SyllabusHatasi("Dosya seçilmedi.")
+        try:
+            icerik = dosya.read(en_fazla + 1)
+        finally:
+            dosya.close()
+        if len(icerik) > en_fazla:
+            raise SyllabusHatasi(boyut_mesaji)
+        mime_turu = dosya_turunu_bul(icerik)
+        if mime_turu is None:
+            raise SyllabusHatasi("Bu dosya türü desteklenmiyor. Lütfen PDF, PNG veya JPG dosyası seç.")
+        ham = syllabus.parser_olustur(ENV_DOSYASI).oku(icerik, mime_turu)
+        ders, uyarilar = syllabus_forma_cevir(ham)
+    except SyllabusHatasi as hata:
+        return jsonify({"hata": str(hata)}), 400
+    except RequestEntityTooLarge:
+        return jsonify({"hata": boyut_mesaji}), 413
+    except Exception as hata:
+        # Beklenmeyen hata: ayrıntı (ve olası gizli bilgi) kullanıcıya ya da kayda yazılmaz.
+        app.logger.error("Syllabus okunurken beklenmeyen hata: %s", type(hata).__name__)
+        return jsonify({"hata": "Syllabus okunurken beklenmeyen bir hata oluştu."}), 500
+    return jsonify({"ders": ders, "uyarilar": uyarilar})
 
 
 @app.route("/api/dersler/<int:ders_id>", methods=["DELETE"])

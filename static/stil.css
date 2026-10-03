@@ -18,6 +18,7 @@
     --hata: #e03131;              /* eksik alan çerçevesi, hata yazısı, Sil butonu */
     --uyari-yazi: #8a6100;        /* sarı uyarı yazısı */
     --uyari-zemin: #fff4cc;       /* sarı uyarı zemini */
+    --uyari-cerceve: #e0a800;     /* sarı işaretli (kontrol edilecek) alanın çerçevesi */
 
     /* Sabit ölçüler */
     --saat-sutunu: 52px;          /* soldaki saat etiketi sütununun genişliği */
@@ -536,15 +537,71 @@ body {
     opacity: 0.55;
 }
 
-.rozet {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    padding: 2px 8px;
-    border-radius: 999px;
-    background: var(--uyari-zemin);
-    color: var(--uyari-yazi);
-    font-size: 11px;
+/* ---------- Syllabus yükleme ekranı ---------- */
+
+.syllabus-ekrani {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    font-size: 13px;
+}
+
+/* Dosyanın sürüklenip bırakıldığı alan. */
+.birakma-alani {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 32px 16px;
+    border: 2px dashed var(--cerceve);
+    border-radius: 12px;
+    text-align: center;
+}
+
+.birakma-alani small {
+    color: var(--soluk-yazi);
+}
+
+/* Üzerine dosya getirilince vurgulanır. */
+.birakma-alani.suruklenen {
+    border-color: var(--vurgu);
+    background: var(--vurgu-zemin);
+}
+
+/* "Syllabus okunuyor..." göstergesi */
+.okunuyor {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 40px 16px;
+    color: var(--soluk-yazi);
+}
+
+.donen-halka {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--cerceve);
+    border-top-color: var(--vurgu);
+    border-radius: 50%;
+    animation: don 0.8s linear infinite;
+}
+
+@keyframes don {
+    to { transform: rotate(360deg); }
+}
+
+/* Formun üstündeki "Syllabus'tan okundu" notu: her satır ayrı paragraf. */
+.syllabus-notu {
+    margin: 0;
+}
+
+.syllabus-notu p {
+    margin: 0 0 4px;
+}
+
+.syllabus-notu p:last-child {
+    margin-bottom: 0;
 }
 
 /* ---------- Form ---------- */
@@ -600,6 +657,13 @@ body {
 .ders-formu textarea:focus {
     outline: 2px solid var(--vurgu-zemin);
     border-color: var(--vurgu);
+}
+
+/* Syllabus'tan gelen ve kontrol edilmesi gereken alan: sarı (model emin değil, saat yuvarlandı...).
+   Kırmızı (eksik) kuralı bundan sonra geldiği için boş zorunlu alan yine kırmızı çerçeveli olur. */
+.ders-formu .emin-degil {
+    border-color: var(--uyari-cerceve);
+    background: var(--uyari-zemin);
 }
 
 /* Eksik veya hatalı zorunlu alan: kırmızı çerçeve */
@@ -684,6 +748,14 @@ body {
 
 .satir-basliklari {
     margin-bottom: 4px;
+}
+
+/* Satırdaki sarı alanların açıklaması: satırın altında, tam genişlikte. */
+.satir-notu {
+    grid-column: 1 / -1;
+    margin-top: -4px;
+    font-size: 11px;
+    color: var(--uyari-yazi);
 }
 
 .satir-ekle {

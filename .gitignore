@@ -12,6 +12,3 @@ __pycache__/
 
 # macOS
 .DS_Store
-
-# Veritabanı yedekleri (şema değişikliklerinden önce alınan kopyalar)
-derstakip.backup-*.db

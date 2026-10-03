@@ -65,7 +65,7 @@
     </main>
 
     <!-- ============================================================
-         DERS PENCERESİ: önce seçim ekranı, sonra ders formu gösterilir.
+         DERS PENCERESİ: önce seçim ekranı, sonra (syllabus yükleme ekranı ve) ders formu gösterilir.
          ============================================================ -->
     <dialog class="pencere" id="ders-penceresi">
         <header class="pencere-baslik">
@@ -75,8 +75,7 @@
 
         <!-- 1) Nasıl ekleneceğini seçme ekranı -->
         <div class="secim-ekrani" id="secim-ekrani">
-            <button type="button" class="secenek" disabled>
-                <span class="rozet">yakında</span>
+            <button type="button" class="secenek" id="syllabus-ekle">
                 <strong>Syllabus ile ekle</strong>
                 <small>Ders izlencesinden otomatik doldur</small>
             </button>
@@ -86,8 +85,32 @@
             </button>
         </div>
 
-        <!-- 2) Ders formu. Hem yeni ders hem düzenleme için aynı form kullanılır. -->
+        <!-- 2) Syllabus yükleme ekranı: dosya seçilir ya da sürüklenir, okununca ders formu açılır. -->
+        <div class="syllabus-ekrani" id="syllabus-ekrani" hidden>
+            <div class="birakma-alani" id="birakma-alani">
+                <strong>Syllabus dosyasını buraya sürükle</strong>
+                <small>PDF, PNG veya JPG · en fazla {{ ayarlar.syllabusEnFazlaMB }} MB · tek bir dersin syllabus'u</small>
+                <button type="button" class="dugme ana" id="dosya-sec">Dosya seç</button>
+                <input type="file" id="dosya-girdisi" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" hidden>
+            </div>
+            <div class="okunuyor" id="okunuyor" hidden>
+                <span class="donen-halka"></span>
+                <span>Syllabus okunuyor...</span>
+            </div>
+            <p class="mesaj hata" id="syllabus-hatasi" hidden></p>
+            <footer class="pencere-dugmeleri">
+                <span class="bosluk"></span>
+                <button type="button" class="dugme" id="syllabus-elle-ekle">Elle ekle</button>
+            </footer>
+        </div>
+
+        <!-- 3) Ders formu. Yeni ders, düzenleme ve syllabus'tan ön doldurma için aynı form kullanılır. -->
         <form class="ders-formu" id="ders-formu" novalidate hidden>
+
+            <!-- Sadece syllabus'tan doldurulunca görünür. -->
+            <div class="mesaj uyari syllabus-notu" id="syllabus-notu" hidden></div>
+            <!-- Formda görünmeyen, dersle birlikte saklanan syllabus bilgisi. -->
+            <input type="hidden" name="devamsizlik_metni">
 
             <div class="alanlar">
                 <label class="alan">

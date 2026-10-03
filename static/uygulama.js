@@ -8,6 +8,7 @@
 let dersler = [];               // sunucudan gelen bütün dersler
 let siradakiRenk = null;        // yeni derse önerilecek (kullanılmayan ilk) renk
 let duzenlenenDersId = null;    // formda açık olan dersin kimliği (yeni derste null)
+let okumaNo = 0;                // her syllabus okumasının numarası (pencere kapanınca eski okuma yok sayılır)
 let haftaKaymasi = 0;           // gösterilen hafta: 0 = bu hafta, -1 = geçen hafta, 1 = gelecek hafta
 
 const AY_KISALTMALARI = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
@@ -18,6 +19,12 @@ const izgara = document.getElementById("izgara");
 const pencere = document.getElementById("ders-penceresi");
 const pencereBasligi = document.getElementById("pencere-basligi");
 const secimEkrani = document.getElementById("secim-ekrani");
+const syllabusEkrani = document.getElementById("syllabus-ekrani");
+const birakmaAlani = document.getElementById("birakma-alani");
+const dosyaGirdisi = document.getElementById("dosya-girdisi");
+const okunuyor = document.getElementById("okunuyor");
+const syllabusHatasi = document.getElementById("syllabus-hatasi");
+const syllabusNotu = document.getElementById("syllabus-notu");
 const form = document.getElementById("ders-formu");
 const oturumListesi = document.getElementById("oturum-listesi");
 const degerlendirmeListesi = document.getElementById("degerlendirme-listesi");
@@ -506,8 +513,107 @@ function haftayiDegistir(kayma) {
 function secimEkraniniAc() {
     pencereBasligi.textContent = "Ders ekle";
     secimEkrani.hidden = false;
+    syllabusEkrani.hidden = true;
     form.hidden = true;
     pencere.showModal();
+}
+
+// ---------- Syllabus ile ekleme ----------
+
+// Dosya seçme / sürükleme ekranını açar.
+function syllabusEkraniniAc() {
+    pencereBasligi.textContent = "Syllabus ile ekle";
+    secimEkrani.hidden = true;
+    form.hidden = true;
+    syllabusEkrani.hidden = false;
+    okunuyorGoster(false);
+    mesajGoster(syllabusHatasi, "");
+}
+
+// "Syllabus okunuyor..." göstergesini açar/kapatır (açıkken dosya alanı gizlenir).
+function okunuyorGoster(acik) {
+    okunuyor.hidden = !acik;
+    birakmaAlani.hidden = acik;
+}
+
+function syllabusHatasiGoster(yazi) {
+    okunuyorGoster(false);
+    mesajGoster(syllabusHatasi, yazi + " Dersi “Elle ekle” ile kendin de girebilirsin.");
+}
+
+// Seçilen dosyayı sunucuya gönderir; okunan bilgilerle ders formunu ön doldurulmuş açar.
+// API anahtarı sunucudadır, tarayıcıya hiç gelmez.
+async function syllabusOku(dosya) {
+    mesajGoster(syllabusHatasi, "");
+    const turUygun = ["application/pdf", "image/png", "image/jpeg"].includes(dosya.type)
+        || /\.(pdf|png|jpe?g)$/i.test(dosya.name);
+    if (!turUygun) {
+        syllabusHatasiGoster("Bu dosya türü desteklenmiyor. Lütfen PDF, PNG veya JPG dosyası seç.");
+        return;
+    }
+    if (dosya.size > AYARLAR.syllabusEnFazlaMB * 1024 * 1024) {
+        syllabusHatasiGoster(`Dosya çok büyük. En fazla ${AYARLAR.syllabusEnFazlaMB} MB'lık dosya yükleyebilirsin.`);
+        return;
+    }
+
+    const buOkuma = ++okumaNo;
+    okunuyorGoster(true);
+    let sonuc;
+    let hata = null;
+    try {
+        const veri = new FormData();
+        veri.append("dosya", dosya);
+        const yanit = await fetch("/api/syllabus", { method: "POST", body: veri });
+        sonuc = await yanit.json();
+        if (!yanit.ok) hata = sonuc.hata || "Syllabus okunamadı.";
+    } catch {
+        hata = "Sunucuya ulaşılamadı ya da yanıt anlaşılamadı. Sunucunun çalıştığından emin olup tekrar dene.";
+    }
+    // Bu arada pencere kapatıldıysa ya da başka bir okuma başladıysa sonucu yok say.
+    if (buOkuma !== okumaNo || !pencere.open) return;
+    if (hata) {
+        syllabusHatasiGoster(hata);
+        return;
+    }
+    dersFormunuAc(sonuc.ders, sonuc.uyarilar || []);
+}
+
+// Bir form alanını sarı işaretler; nedeni üzerine gelince görünür.
+function alaniIsaretle(alan, aciklama) {
+    alan.classList.add("emin-degil");
+    alan.title = aciklama;
+}
+
+// Kullanıcı sarı alanı değiştirdiyse (kontrol etti demektir) işareti kaldırır.
+function isaretiKaldir(alan) {
+    alan.classList.remove("emin-degil");
+    alan.removeAttribute("title");
+    const satir = alan.closest(".satir");
+    if (satir && !satir.querySelector(".emin-degil")) satir.querySelector(".satir-notu")?.remove();
+}
+
+// Formun üstündeki "Syllabus'tan okundu" notunu yazar. uyarilar null ise not gizlenir.
+function syllabusNotunuYaz(uyarilar) {
+    syllabusNotu.replaceChildren();
+    syllabusNotu.hidden = uyarilar === null;
+    if (uyarilar === null) return;
+    const satirlar = [
+        "Syllabus'tan okundu, lütfen kontrol et.",
+        "Sarı alanlar: modelin emin olmadığı, yuvarlanan ya da takvim dışında kalan değerler. "
+            + "Kırmızı alanlar: zorunlu ama belgede bulunamadı, sen doldur.",
+        ...uyarilar,
+    ];
+    satirlar.forEach((yazi, sira) => {
+        const satir = document.createElement("p");
+        if (sira === 0) {
+            const kalin = document.createElement("strong");
+            kalin.textContent = yazi;
+            satir.appendChild(kalin);
+        } else {
+            satir.textContent = yazi;
+        }
+        syllabusNotu.appendChild(satir);
+    });
 }
 
 // Açılır listede o değer yoksa ekler (takvim saatleri dışında kalmış eski kayıt kaybolmasın diye).
@@ -519,9 +625,11 @@ function secenegiGarantile(liste, deger) {
 
 // Satırdaki bitiş saatini başlangıca uydurur:
 // - başlangıçtan sonra olmayan bitiş seçenekleri pasif olur,
-// - bitiş geçersiz kaldıysa (veya zorunlu olup boşsa) başlangıç + 1 saat yapılır,
+// - otomatikDoldur ise: bitiş geçersiz kaldıysa (veya zorunlu olup boşsa) başlangıç + 1 saat yapılır.
+//   (Kullanıcı başlangıcı değiştirince. Satır ilk doldurulurken yapılmaz ki syllabus'ta
+//   bulunamayan bitiş saati uydurulmasın, boş ve kırmızı kalsın.)
 // - opsiyonel saatte (değerlendirme) başlangıç boşsa bitiş de boşalır.
-function bitisiAyarla(satir) {
+function bitisiAyarla(satir, otomatikDoldur) {
     const baslangic = satir.querySelector('[data-saat="asagi"]');
     const bitis = satir.querySelector('[data-saat="yukari"]');
     const zorunlu = "zorunlu" in bitis.dataset;
@@ -538,6 +646,7 @@ function bitisiAyarla(satir) {
         return;
     }
     bitis.disabled = false;
+    if (!otomatikDoldur) return;
     const gecersiz = bitis.value !== "" && bitis.value <= baslangic.value;
     if (gecersiz || (zorunlu && bitis.value === "")) {
         const birSaatSonra = saatYazisi(saatiSayiyaCevir(baslangic.value) + 1);
@@ -551,8 +660,17 @@ function satirEkle(sablonId, liste, veri = {}) {
     const satir = document.getElementById(sablonId).content.firstElementChild.cloneNode(true);
     // Kayıtlı bir satırsa kimliğini sakla ki güncellenirken aynı satır olarak kalsın.
     if (veri.id != null) satir.dataset.id = veri.id;
+    // Kalemin formda görünmeyen adı (eski sürümdeki ya da syllabus'taki) satırla birlikte taşınır.
+    if (veri.ad) satir.dataset.ad = veri.ad;
+    const notlar = [];
     satir.querySelectorAll("[data-alan]").forEach((alan) => {
         let deger = veri[alan.dataset.alan];
+        // Syllabus'tan gelen satırda kontrol edilmesi gereken alan sarı işaretlenir.
+        const aciklama = veri.isaretler?.[alan.dataset.alan];
+        if (aciklama) {
+            alaniIsaretle(alan, aciklama);
+            notlar.push(`${alan.getAttribute("aria-label")}: ${aciklama}`);
+        }
         if (deger == null) return;
         if (alan.dataset.saat) {
             // Eski kayıtta tam saat olmayan değer: başlangıç aşağı, bitiş yukarı yuvarlanır.
@@ -561,23 +679,36 @@ function satirEkle(sablonId, liste, veri = {}) {
         }
         alan.value = deger;
     });
+    if (notlar.length > 0) {
+        const not = document.createElement("small");
+        not.className = "satir-notu";
+        not.textContent = notlar.join(" · ");
+        satir.appendChild(not);
+    }
     liste.appendChild(satir);
-    bitisiAyarla(satir);
+    bitisiAyarla(satir, false);
 }
 
 // TEK FORM BİLEŞENİ: ders formunu verilen başlangıç verisiyle açar.
 //   dersFormunuAc()                 -> boş form (elle ekleme)
 //   dersFormunuAc(ders)             -> kayıtlı dersi düzenleme (ders.id var)
-//   dersFormunuAc({kod: ..., ...})  -> ön doldurulmuş yeni ders (ileride syllabus'tan)
-function dersFormunuAc(baslangicVerisi = {}) {
+//   dersFormunuAc({kod: ..., ...}, uyarilar) -> syllabus'tan ön doldurulmuş yeni ders
+//       (uyarilar: formun üstündeki notta gösterilecek ek satırlar)
+function dersFormunuAc(baslangicVerisi = {}, syllabusUyarilari = null) {
     duzenlenenDersId = baslangicVerisi.id ?? null;
     pencereBasligi.textContent = duzenlenenDersId ? "Dersi düzenle" : "Ders ekle";
     silDugmesi.hidden = !duzenlenenDersId;
 
     form.reset();
     // Eski dersin hedef notu yoksa liste boş (kırmızı) gelir ve seçilmesi istenir.
-    for (const ad of ["kod", "ad", "kredi", "akts", "devamsizlik_hakki", "hedef_not"]) {
+    for (const ad of ["kod", "ad", "kredi", "akts", "devamsizlik_hakki", "hedef_not", "devamsizlik_metni"]) {
         form.elements[ad].value = baslangicVerisi[ad] ?? "";
+    }
+    // Syllabus notu ve sarı işaretler (önceki açılıştan kalanlar temizlenir).
+    syllabusNotunuYaz(syllabusUyarilari);
+    form.querySelectorAll(".emin-degil").forEach(isaretiKaldir);
+    for (const [ad, aciklama] of Object.entries(baslangicVerisi.isaretler || {})) {
+        alaniIsaretle(form.elements[ad], aciklama);
     }
     form.elements.renk.value = baslangicVerisi.renk || siradakiRenk;
 
@@ -594,6 +725,7 @@ function dersFormunuAc(baslangicVerisi = {}) {
 
     mesajGoster(kayitHatasi, "");
     secimEkrani.hidden = true;
+    syllabusEkrani.hidden = true;
     form.hidden = false;
     if (!pencere.open) pencere.showModal();
     formuDogrula();
@@ -604,6 +736,7 @@ function dersFormunuAc(baslangicVerisi = {}) {
 function satiriOku(satir) {
     const veri = {};
     if (satir.dataset.id) veri.id = Number(satir.dataset.id);
+    if (satir.dataset.ad) veri.ad = satir.dataset.ad;
     satir.querySelectorAll("[data-alan]").forEach((alan) => {
         veri[alan.dataset.alan] = alan.value.trim();
     });
@@ -613,7 +746,7 @@ function satiriOku(satir) {
 // Formun tamamını sunucuya gönderilecek ders nesnesine çevirir.
 function formuOku() {
     const ders = {};
-    for (const ad of ["kod", "ad", "kredi", "akts", "devamsizlik_hakki", "hedef_not", "renk"]) {
+    for (const ad of ["kod", "ad", "kredi", "akts", "devamsizlik_hakki", "hedef_not", "renk", "devamsizlik_metni"]) {
         ders[ad] = form.elements[ad].value.trim();
     }
     ders.oturumlar = [...oturumListesi.children].map((satir) => {
@@ -728,6 +861,28 @@ async function dersiSil() {
 
 document.getElementById("ekle-dugmesi").addEventListener("click", secimEkraniniAc);
 document.getElementById("elle-ekle").addEventListener("click", () => dersFormunuAc());
+
+// Syllabus ile ekleme: dosya seçme butonu ve sürükle-bırak.
+document.getElementById("syllabus-ekle").addEventListener("click", syllabusEkraniniAc);
+document.getElementById("syllabus-elle-ekle").addEventListener("click", () => dersFormunuAc());
+document.getElementById("dosya-sec").addEventListener("click", () => dosyaGirdisi.click());
+dosyaGirdisi.addEventListener("change", () => {
+    if (dosyaGirdisi.files.length > 0) syllabusOku(dosyaGirdisi.files[0]);
+    dosyaGirdisi.value = "";   // aynı dosya tekrar seçilebilsin
+});
+// Pencereye bırakılan dosyayı tarayıcı kendi açmasın (sayfadan çıkılmasın).
+for (const olayAdi of ["dragover", "drop"]) {
+    pencere.addEventListener(olayAdi, (olay) => olay.preventDefault());
+}
+birakmaAlani.addEventListener("dragover", () => birakmaAlani.classList.add("suruklenen"));
+birakmaAlani.addEventListener("dragleave", () => birakmaAlani.classList.remove("suruklenen"));
+birakmaAlani.addEventListener("drop", (olay) => {
+    birakmaAlani.classList.remove("suruklenen");
+    const dosya = olay.dataTransfer.files[0];
+    if (dosya) syllabusOku(dosya);
+});
+// Pencere kapanınca süren okuma yok sayılır.
+pencere.addEventListener("close", () => { okumaNo++; });
 document.getElementById("pencere-kapat").addEventListener("click", () => pencere.close());
 document.getElementById("vazgec-dugmesi").addEventListener("click", () => pencere.close());
 silDugmesi.addEventListener("click", dersiSil);
@@ -752,7 +907,9 @@ form.addEventListener("click", (olay) => {
 // Formda her yazışta/seçimde kontrolleri yenile.
 form.addEventListener("input", (olay) => {
     // Başlangıç saati değişince aynı satırdaki bitişi otomatik ayarla.
-    if (olay.target.dataset.saat === "asagi") bitisiAyarla(olay.target.closest(".satir"));
+    if (olay.target.dataset.saat === "asagi") bitisiAyarla(olay.target.closest(".satir"), true);
+    // Sarı işaretli alan değiştirildiyse kontrol edilmiş sayılır.
+    if (olay.target.classList.contains("emin-degil")) isaretiKaldir(olay.target);
     formuDogrula();
 });
 
