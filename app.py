@@ -173,7 +173,6 @@ def bu_haftanin_gunleri(bugun):
         tarih = pazartesi + timedelta(days=sira)
         gunler.append({
             "kisaltma": kisaltma,
-            "ayin_gunu": tarih.day,
             "bugun_mu": tarih == bugun,
         })
     return gunler

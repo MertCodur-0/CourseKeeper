@@ -419,15 +419,12 @@ function bloklariSigdir() {
     document.querySelectorAll(".ders-blogu").forEach(bloguSigdir);
 }
 
-// Gün başlıklarındaki tarihleri ve gezinme satırındaki yazıyı gösterilen haftaya göre yazar.
+// Gösterilen haftaya göre bugünün başlığını vurgular ve gezinme satırındaki tarih aralığını yazar.
+// (Gün başlıklarında sadece gün adı yazar; haftanın tarihleri gezinme satırında görünür.)
 function basliklariYaz(hafta) {
     document.querySelectorAll(".gun-baslik, .gun-sutunu").forEach((eleman) => {
         const tarih = hafta[Number(eleman.dataset.gun)];
         eleman.classList.toggle("bugun", tarihYazisi(tarih) === AYARLAR.bugun);
-        if (eleman.classList.contains("gun-baslik")) {
-            eleman.querySelector("span").textContent =
-                `${AYARLAR.gunler[eleman.dataset.gun]} ${tarih.getDate()}`;
-        }
     });
     const ilk = hafta[0];
     const son = hafta[6];

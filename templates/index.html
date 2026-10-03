@@ -28,10 +28,10 @@
                     <!-- Sol üst köşe: bugünün tarihi -->
                     <div class="kose">{{ bugun_yazisi }}</div>
 
-                    <!-- Gün başlıkları (hafta değişince tarihleri JavaScript günceller) -->
+                    <!-- Gün başlıkları (hafta değişince bugünün vurgusunu JavaScript günceller) -->
                     {% for gun in gunler %}
                     <div class="gun-baslik{% if gun.bugun_mu %} bugun{% endif %}" data-gun="{{ loop.index0 }}">
-                        <span>{{ gun.kisaltma }} {{ gun.ayin_gunu }}</span>
+                        <span>{{ gun.kisaltma }}</span>
                     </div>
                     {% endfor %}
 
