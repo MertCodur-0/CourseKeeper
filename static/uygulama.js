@@ -1123,6 +1123,13 @@ function asagiYuvarla(sayi) {
     return String(Math.floor(Math.round(sayi * 1e6) / 1e5) / 10);
 }
 
+// Sonuç kutusundaki sayılar: en fazla 2 ondalık, gereksiz sıfırlar atılır (77.50 -> 77.5, 81.00 -> 81).
+// Toplam aşağı, "eksik puan" yukarı yuvarlanır (yukari = true) ki durum olduğundan iyi görünmesin.
+function ikiOndalik(sayi, yukari = false) {
+    const yuzKati = Math.round(sayi * 1e6) / 1e4;
+    return String((yukari ? Math.ceil(yuzKati) : Math.floor(yuzKati)) / 100);
+}
+
 // Kalemin puanı 100 üzerinden mi giriliyor (vize, final)?
 function yuzUzerindenMi(kalem) {
     return AYARLAR.yuzUzerindenTurler.includes(kalem.tur);
@@ -1168,7 +1175,8 @@ function notDurumunuHesapla(ders) {
     return durum;
 }
 
-// Hedefe göre sonuç kutusunun içeriğini hazırlar: { baslik, ek: [satırlar], duzenle }
+// Sonuç kutusunun alt notunu hazırlar: { baslik, ek: [satırlar], duzenle }
+// Hedefe ulaşıldıysa not yoktur, null döner.
 function sonucMesaji(ders, durum) {
     if (ders.degerlendirmeler.length === 0) {
         return { baslik: "Bu derse değerlendirme kalemi eklenmemiş.", ek: ["Kalemleri “Düzenle” ile ekleyebilirsin."], duzenle: true };
@@ -1179,15 +1187,17 @@ function sonucMesaji(ders, durum) {
     }
     // Hedefe ulaşmak için daha kaç puan gerekiyor?
     const gereken = etkinEsik(hedef.alt_sinir) - durum.kazanilan;
-    if (gereken <= 0) return { baslik: "Hedefe ulaştın." };
+    if (gereken <= 0) return null;
 
-    // Girilecek normal kalem kalmadı.
+    // Girilecek normal kalem kalmadı: hedefe kaç puan eksik kaldığı söylenir.
     if (durum.kalanNormal.length === 0) {
         const ek = [];
-        if (durum.kalanEkstraPuan >= gereken) {
-            ek.push(`Kalan ekstra kalemlerden toplam en az ${yukariYuvarla(gereken)} puan alırsan hedefe ulaşırsın.`);
+        if (durum.kalanEkstraPuan > 0) {
+            ek.push(gereken <= durum.kalanEkstraPuan
+                ? "Ekstra puanlarla ulaşılabilir."
+                : "Ekstra puanlarla da ulaşılamıyor.");
         }
-        return { baslik: "Tüm kalemler girildi, hedefin altında kaldın.", ek };
+        return { baslik: `Hedef ${hedef.harf} için ${ikiOndalik(gereken, true)} puan eksik.`, ek };
     }
 
     // Kalan normal kalemlerin hepsinden tam puan alınsa bile yetmiyor.
@@ -1297,24 +1307,52 @@ async function puaniKaydet(kalemId, girdi) {
 }
 
 // Not hesabının sonucunu çizer: tek bir sonuç kutusu ve (gerekirse) altında küçük bir not.
+// Kutu: ana yazı "<toplam> puan · <harf>"; hedefe ulaşıldıysa yeşil, ulaşılmadıysa sarı ve
+// altında küçük not; hiç puan girilmediyse nötr gri. Renkler stil.css'te (--sonuc-...).
 function hesabiCiz(ders) {
     const durum = notDurumunuHesapla(ders);
     hesapOzeti.replaceChildren();
 
-    const sonuc = sonucMesaji(ders, durum);
+    const not = sonucMesaji(ders, durum);   // null: hedefe ulaşıldı
     const kutu = eleman("div", "hesap-sonucu");
-    kutu.appendChild(eleman("strong", "", sonuc.baslik));
-    for (const yazi of sonuc.ek || []) kutu.appendChild(eleman("p", "", yazi));
-    if (sonuc.duzenle) {
+
+    if (ders.degerlendirmeler.length === 0) {
+        // Kalem yok: nötr kutuda sadece mesaj ve Düzenle butonu.
+        kutu.appendChild(eleman("strong", "", not.baslik));
+        for (const yazi of not.ek) kutu.appendChild(eleman("p", "", yazi));
+    } else {
+        // Renk: puan girilmişse ve hedef belliyse yeşil (ulaşıldı) ya da sarı (ulaşılmadı).
+        let renk = null;
+        if (durum.girilenVar && hedefHarf(ders)) renk = not === null ? "yesil" : "sari";
+        if (renk) kutu.classList.add(renk);
+
+        const anaYazi = eleman("strong", "ana-yazi");
+        // Anlam sadece renge bağlı kalmasın diye küçük bir simge: yeşilde ✓, sarıda !
+        if (renk) {
+            const simge = eleman("span", "durum-simgesi", renk === "yesil" ? "✓" : "!");
+            simge.setAttribute("role", "img");
+            simge.setAttribute("aria-label", renk === "yesil" ? "Hedefe ulaşıldı" : "Hedefe ulaşılmadı");
+            anaYazi.appendChild(simge);
+        }
+        // Harf, yuvarlanmamış toplama göre bulunur.
+        anaYazi.appendChild(eleman("span", "", durum.girilenVar
+            ? `${ikiOndalik(durum.kazanilan)} puan · ${harfSeviyesi(durum.kazanilan).harf}`
+            : "Henüz puan girilmedi"));
+        if (durum.girilenVar && durum.kalanNormal.length > 0) {
+            anaYazi.appendChild(eleman("small", "", "(kalan kalemler hariç)"));
+        }
+        kutu.appendChild(anaYazi);
+
+        // Alt not: hedefe ulaşılmadıysa (ya da hiç puan girilmediyse) ne gerektiği.
+        if (not) {
+            for (const yazi of [not.baslik, ...(not.ek || [])]) kutu.appendChild(eleman("p", "", yazi));
+        }
+    }
+    if (not?.duzenle) {
         const dugme = eleman("button", "dugme", "Düzenle");
         dugme.type = "button";
         dugme.addEventListener("click", () => dersFormunuAc(ders));
         kutu.appendChild(dugme);
-    }
-    // Kutunun altındaki küçük gri satır: şu ana kadar kazanılan puan ve karşılık geldiği harf.
-    if (durum.girilenVar) {
-        kutu.appendChild(eleman("p", "kucuk-not",
-            `Şu an: ${asagiYuvarla(durum.kazanilan)} puan (${harfSeviyesi(durum.kazanilan).harf} seviyesi)`));
     }
     hesapOzeti.appendChild(kutu);
 
