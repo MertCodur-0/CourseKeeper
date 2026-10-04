@@ -6,9 +6,11 @@ A personal academic tracker for university students. Keep your courses, exams, g
 
 The interface and code are in Turkish, since the app is built around the grading system used at Turkish universities (AA–DD letter grades).
 
-<!-- Put screenshots or GIFs in the docs/ folder and add them here, for example:
-![Main screen](docs/main-screen.png)
--->
+
+
+https://github.com/user-attachments/assets/74a04834-2f04-435e-a368-fb425d51df50
+
+
 
 ## Features
 
