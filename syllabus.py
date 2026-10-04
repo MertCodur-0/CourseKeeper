@@ -68,7 +68,15 @@ CIKTI_SEMASI = {
             "number", "Devamsızlık hakkı, SADECE belgede yüzde olarak yazıyorsa (ör. %30 için 30). Hesaplama yapma."),
         "devamsizlik_metni": _bos_olabilir(
             "string", "Devamsızlık kuralı yüzde olarak değil de saat/hafta gibi yazılmışsa belgedeki ham metin."),
-        "emin_olmayanlar": _emin_olmayanlar(["kod", "ad", "kredi", "akts", "devamsizlik_yuzde"]),
+        "lab_devamsizlik_yuzde": _bos_olabilir(
+            "number", "SADECE belgede lab için AYRI bir devamsızlık hakkı yüzdesi açıkça yazıyorsa."),
+        "zorunlu_katilim_yuzde": _bos_olabilir(
+            "number", "Belgede devamsızlık hakkı yerine katılım zorunluluğu yazıyorsa (ör. 'en az %70 katılım' için 70)."),
+        "lab_zorunlu_katilim_yuzde": _bos_olabilir(
+            "number", "Lab için AYRI bir katılım zorunluluğu yüzdesi açıkça yazıyorsa."),
+        "emin_olmayanlar": _emin_olmayanlar(
+            ["kod", "ad", "kredi", "akts", "devamsizlik_yuzde", "lab_devamsizlik_yuzde",
+             "zorunlu_katilim_yuzde", "lab_zorunlu_katilim_yuzde"]),
         "oturumlar": {
             "type": "array",
             "description": "Haftalık ders saatleri. Teori ve lab ayrı satırlardaysa ayrı oturumlar.",
@@ -110,6 +118,7 @@ CIKTI_SEMASI = {
         },
     },
     "required": ["kod", "ad", "kredi", "akts", "devamsizlik_yuzde", "devamsizlik_metni",
+                 "lab_devamsizlik_yuzde", "zorunlu_katilim_yuzde", "lab_zorunlu_katilim_yuzde",
                  "emin_olmayanlar", "oturumlar", "degerlendirmeler"],
 }
 
@@ -130,6 +139,11 @@ Alanlar:
 - devamsizlik_yuzde: yalnızca belgede devamsızlık hakkı YÜZDE olarak yazıyorsa.
   Saat, hafta ya da ders sayısı olarak yazıyorsa yüzdeye ÇEVİRME: devamsizlik_yuzde null kalsın,
   belgedeki ham metni devamsizlik_metni alanına yaz.
+- lab_devamsizlik_yuzde: yalnızca belgede lab (uygulama) için teoriden AYRI bir devamsızlık hakkı yüzdesi
+  açıkça yazıyorsa. Tek bir sınır varsa o devamsizlik_yuzde'dir, lab_devamsizlik_yuzde null kalır.
+- zorunlu_katilim_yuzde / lab_zorunlu_katilim_yuzde: belgede devamsızlık hakkı yerine katılım zorunluluğu
+  yazıyorsa (ör. "en az %70 katılım", "70% attendance is required") o yüzdeyi buraya yaz (70).
+  Kendin çıkarma yapma: bu durumda devamsizlik_yuzde null kalsın. Hiçbir sınırı uydurma; yazmıyorsa null.
 - oturumlar: haftalık ders saatleri. Teori ve lab ayrı satırlardaysa ayrı oturum yaz; derslikleri farklı olabilir.
   gun: Pazartesi/Monday/Mon/Pzt -> "pazartesi", Salı/Tuesday/Tue/Sal -> "sali", Çarşamba/Wednesday/Wed/Çar -> "carsamba",
   Perşembe/Thursday/Thu/Per -> "persembe", Cuma/Friday/Fri/Cum -> "cuma", Cumartesi/Saturday/Sat/Cmt -> "cumartesi",

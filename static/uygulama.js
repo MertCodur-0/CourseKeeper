@@ -6,6 +6,9 @@
 // ============================================================
 
 let dersler = [];               // sunucudan gelen bütün dersler
+// Devamsızlık için gereken veri: şimdiki zaman, dönem, ders yapılmayan tarihler, yoklama kayıtları.
+// Hesap ve arayüzü static/yoklama.js'tedir.
+let yoklamaVerisi = { simdi: "", donem: null, ders_disi_tarihler: [], kayitlar: [] };
 let siradakiRenk = null;        // yeni derse önerilecek (kullanılmayan ilk) renk
 let duzenlenenDersId = null;    // formda açık olan dersin kimliği (yeni derste null)
 let okumaNo = 0;                // her syllabus okumasının numarası (pencere kapanınca eski okuma yok sayılır)
@@ -112,11 +115,17 @@ async function istekGonder(yontem, adres, veri) {
 // ============================================================
 
 async function dersleriYukle() {
-    const sonuc = await istekGonder("GET", "/api/dersler");
+    // Dersler ve yoklama verisi birlikte alınır ki takvim ve panel ikisini de aynı anda görsün.
+    const [sonuc, yoklama] = await Promise.all([
+        istekGonder("GET", "/api/dersler"),
+        istekGonder("GET", "/api/yoklama"),
+    ]);
     dersler = sonuc.dersler;
     siradakiRenk = sonuc.siradaki_renk;
+    yoklamaVerisiniAl(yoklama);
     takvimiCiz();
     paneliYenile();
+    yoklamaDurumunuGuncelle();
 }
 
 // ---------- Çakışan bloklar: "boşluk doldurma" düzeni ----------
@@ -369,6 +378,8 @@ function blokOlustur(yerlesim) {
 
     icerik.append(kod, altYazi);
     cekirdek.append(icerik, menuDugmesiOlustur());
+    // Ders bloğuysa (sınav değilse) o günün yoklama durumunu sol üst köşede küçük simgeyle göster.
+    if (yerlesim.oturum) yoklamaSimgesiEkle(blok, cekirdek, yerlesim.oturum, yerlesim.tarih);
     blok.append(kutu, cekirdek);
     return blok;
 }
@@ -460,6 +471,7 @@ function takvimiCiz() {
                     ders, bas, bit,
                     renk: renkBul(ders.renk),
                     altYazi: oturum.derslik,
+                    oturum, tarih,   // yoklama simgesi için: hangi oturumun hangi günkü dersi
                     ipucu: `${ders.kod} · ${oturum.derslik} · ${oturum.baslangic}-${oturum.bitis}`,
                 });
             }
@@ -708,7 +720,7 @@ function dersFormunuAc(baslangicVerisi = {}, syllabusUyarilari = null) {
 
     form.reset();
     // Eski dersin hedef notu yoksa liste boş (kırmızı) gelir ve seçilmesi istenir.
-    for (const ad of ["kod", "ad", "kredi", "akts", "devamsizlik_hakki", "hedef_not", "devamsizlik_metni"]) {
+    for (const ad of ["kod", "ad", "kredi", "akts", "devamsizlik_hakki", "lab_devamsizlik_hakki", "hedef_not", "devamsizlik_metni"]) {
         form.elements[ad].value = baslangicVerisi[ad] ?? "";
     }
     // Syllabus notu ve sarı işaretler (önceki açılıştan kalanlar temizlenir).
@@ -754,7 +766,7 @@ function satiriOku(satir) {
 // Formun tamamını sunucuya gönderilecek ders nesnesine çevirir.
 function formuOku() {
     const ders = {};
-    for (const ad of ["kod", "ad", "kredi", "akts", "devamsizlik_hakki", "hedef_not", "renk", "devamsizlik_metni"]) {
+    for (const ad of ["kod", "ad", "kredi", "akts", "devamsizlik_hakki", "lab_devamsizlik_hakki", "hedef_not", "renk", "devamsizlik_metni"]) {
         ders[ad] = form.elements[ad].value.trim();
     }
     ders.oturumlar = [...oturumListesi.children].map((satir) => {
@@ -857,6 +869,17 @@ async function dersiKaydet() {
     if (!formuDogrula()) return;
     try {
         if (duzenlenenDersId) {
+            // Formdan çıkarılan oturumun yoklama kayıtları da silinir: önce onay istenir.
+            // (Formda kalan oturumlar kimlikleriyle güncellenir, kayıtları yerinde durur.)
+            const kalanlar = formuOku().oturumlar.map((oturum) => oturum.id);
+            const ders = dersler.find((d) => d.id === duzenlenenDersId);
+            for (const oturum of ders ? ders.oturumlar : []) {
+                const kayitSayisi = yoklamaKayitSayisi(oturum.id);
+                if (kalanlar.includes(oturum.id) || kayitSayisi === 0) continue;
+                const onay = confirm(`${AYARLAR.gunler[oturum.gun]} ${oturum.baslangic}-${oturum.bitis} oturumunu sildin. `
+                    + `Bu oturumun ${kayitSayisi} yoklama kaydı da silinecek. Devam edilsin mi?`);
+                if (!onay) return;
+            }
             await istekGonder("PUT", `/api/dersler/${duzenlenenDersId}`, formuOku());
         } else {
             await istekGonder("POST", "/api/dersler", formuOku());
@@ -979,7 +1002,7 @@ const notDurumu = document.getElementById("not-durumu");
 const bilgiIcerigi = document.getElementById("bilgi-icerigi");
 
 let seciliDersId = null;       // panelde açık olan dersin kimliği (yoksa null)
-let seciliSekme = "hesap";     // "hesap", "notlar" veya "bilgi"
+let seciliSekme = "hesap";     // "hesap", "devamsizlik", "notlar" veya "bilgi"
 let notZamanlayici = null;     // yazılan notun bekleyen otomatik kaydı
 
 // Küçük yardımcı: bir HTML elemanı oluşturur.
@@ -1081,6 +1104,7 @@ function dersPaneliniCiz(notlariYukle) {
     sekmeyiGoster(seciliSekme);
     kalemTablosunuCiz(ders);
     hesabiCiz(ders);
+    devamsizligiCiz(ders);
     bilgiyiCiz(ders);
 }
 

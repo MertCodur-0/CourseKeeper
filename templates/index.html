@@ -18,6 +18,8 @@
                 <button type="button" id="bugune-don" title="Bu haftaya dön">Bugün</button>
                 <button type="button" id="sonraki-hafta" title="Sonraki hafta" aria-label="Sonraki hafta">›</button>
                 <span class="hafta-yazisi" id="hafta-yazisi"></span>
+                <!-- Bekleyen yoklama varsa görünür; basınca yoklama penceresi açılır. -->
+                <button type="button" class="yoklama-kapsulu" id="yoklama-kapsulu" hidden></button>
                 <!-- Dönem ekranını (akademik takvim ve GPA) açar. -->
                 <button type="button" class="donem-dugmesi" id="donem-dugmesi" title="Akademik takvim ve GPA">Dönem</button>
             </nav>
@@ -67,7 +69,12 @@
 
             <!-- Görünüm: hiçbir ders seçili değil -->
             <div class="panel-gorunumu panel-bos" data-gorunum="bos">
-                Bir ders seçmek için takvimde bloğuna tıkla
+                <span>Bir ders seçmek için takvimde bloğuna tıkla</span>
+                <!-- Ders var ama dönem tarihleri girilmemişse görünür. -->
+                <div class="mesaj uyari donem-uyari-karti" id="donem-uyari-karti" hidden>
+                    Yoklama takibi için dönem tarihlerini gir.
+                    <button type="button" class="baglanti" data-donem-ac>Akademik takvimi aç</button>
+                </div>
             </div>
 
             <!-- Görünüm: seçili dersin paneli (içeriğini JavaScript doldurur) -->
@@ -85,6 +92,7 @@
 
                 <nav class="sekmeler" id="sekmeler">
                     <button type="button" data-sekme="hesap">Not hesabı</button>
+                    <button type="button" data-sekme="devamsizlik">Devamsızlık</button>
                     <button type="button" data-sekme="notlar">Notlar</button>
                     <button type="button" data-sekme="bilgi">Bilgi</button>
                 </nav>
@@ -97,6 +105,9 @@
                     <table class="panel-tablosu" id="kalem-tablosu"></table>
                     <p class="mesaj hata" id="puan-hatasi" hidden></p>
                 </div>
+
+                <!-- Sekme: Devamsızlık (içeriğini static/yoklama.js çizer) -->
+                <div class="sekme-icerigi" data-sekme="devamsizlik" id="devamsizlik-icerigi" hidden></div>
 
                 <!-- Sekme: Notlar (yazarken otomatik kaydedilir) -->
                 <div class="sekme-icerigi" data-sekme="notlar" hidden>
@@ -191,7 +202,12 @@
                 </label>
                 <label class="alan">
                     <span>Devamsızlık hakkı (%)</span>
-                    <input type="number" name="devamsizlik_hakki" min="0" step="any" placeholder="30">
+                    <input type="number" name="devamsizlik_hakki" min="0" max="100" step="any" placeholder="30">
+                </label>
+                <label class="alan genis">
+                    <span>Lab için ayrı devamsızlık hakkı (%)</span>
+                    <input type="number" name="lab_devamsizlik_hakki" min="0" max="100" step="any">
+                    <small class="alan-aciklamasi">Syllabus'ta lab için ayrı sınır varsa doldur; boşsa teori ve lab birlikte sayılır.</small>
                 </label>
             </div>
 
@@ -364,6 +380,24 @@
         </div>
     </dialog>
 
+    <!-- ============================================================
+         YOKLAMA PENCERESİ: bekleyen (geçmiş ama kaydı olmayan) oturumlar. İçeriğini yoklama.js çizer.
+         ============================================================ -->
+    <dialog class="pencere yoklama-penceresi" id="yoklama-penceresi">
+        <header class="pencere-baslik">
+            <h2 id="yoklama-basligi">Bekleyen yoklamalar</h2>
+            <button type="button" class="kapat" id="yoklama-kapat" aria-label="Kapat">×</button>
+        </header>
+        <div class="yoklama-listesi" id="yoklama-listesi"></div>
+        <p class="mesaj hata" id="yoklama-hatasi" hidden></p>
+        <footer class="pencere-dugmeleri">
+            <button type="button" class="dugme" id="yoklama-tumu-katildi">Tümünü katıldım yap</button>
+            <button type="button" class="dugme" id="yoklama-tumu-alinmadi">Tümünü yoklama alınmadı yap</button>
+            <span class="bosluk"></span>
+            <button type="button" class="dugme" id="yoklama-sonra">Sonra</button>
+        </footer>
+    </dialog>
+
     <template id="ders-disi-sablonu">
         <div class="satir ders-disi-satiri">
             <select data-alan="tur" aria-label="Tür">
@@ -445,5 +479,7 @@
     <script src="{{ url_for('static', filename='uygulama.js') }}"></script>
     <!-- Dönem ekranı (akademik takvim ve GPA); uygulama.js'teki yardımcıları kullanır. -->
     <script src="{{ url_for('static', filename='donem.js') }}"></script>
+    <!-- Devamsızlık (yoklama): hesap, yoklama penceresi, takvim simgeleri ve paneldeki sekme. -->
+    <script src="{{ url_for('static', filename='yoklama.js') }}"></script>
 </body>
 </html>

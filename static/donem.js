@@ -204,6 +204,7 @@ async function donemiKaydet() {
         const sonuc = await istekGonder("PUT", "/api/donem", donemFormunuOku());
         donemFormunuDoldur(sonuc);
         donemKayitDurumu.textContent = "Kaydedildi";
+        await dersleriYukle();   // dönem tarihleri değişti: devamsızlık hesabı ve takvim yenilensin
     } catch (hata) {
         mesajGoster(donemHatasi, hata.message);
     }
@@ -215,6 +216,7 @@ async function donemiSil() {
         await istekGonder("DELETE", "/api/donem");
         donemFormunuDoldur({ donem: null, ders_disi_tarihler: [] });
         donemKayitDurumu.textContent = "Dönem silindi";
+        await dersleriYukle();
     } catch (hata) {
         mesajGoster(donemHatasi, hata.message);
     }

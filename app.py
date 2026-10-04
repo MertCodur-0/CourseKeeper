@@ -1,3 +1,4 @@
+import os
 import re
 import shutil
 import sqlite3
@@ -108,6 +109,29 @@ ROUND_MODE = "none"
 #   "floor" : aşağı (3.049 -> 3.04)
 GPA_ROUNDING = "round"
 
+# ---------- Devamsızlık (yoklama) ayarları: sadece burada tanımlı ----------
+# Devamsızlık hangi birimle sayılır?
+#   "hour"    : oturumun süresi kadar saat (2 saatlik derse gelmemek = 2 saat devamsızlık)
+#   "session" : her oturum 1 sayılır
+ATTENDANCE_UNIT = "hour"
+# İzin verilen devamsızlık (toplam × yüzde / 100) tam sayı değilse nasıl yuvarlanır? "floor": aşağı.
+LIMIT_ROUNDING = "floor"
+# Sarı uyarı: kalan hak bu kadar birim ya da daha azsa VEYA kullanılan, limitin bu oranına ulaştıysa.
+UYARI_KALAN_BIRIM = 2
+UYARI_KULLANIM_ORANI = 0.75
+
+# Yoklama durumları. "ad": düğmedeki yazı, "simge": takvimdeki ve listelerdeki küçük işaret.
+#   katildi   : derse gidildi
+#   katilmadi : gidilmedi (devamsızlık sayılır)
+#   alinmadi  : yoklama alınmadı (toplamda kalır, devamsızlık sayılmaz)
+#   iptal     : ders yapılmadı (dönem toplamından düşer)
+YOKLAMA_DURUMLARI = [
+    {"anahtar": "katildi", "ad": "Katıldım", "simge": "✓"},
+    {"anahtar": "katilmadi", "ad": "Katılmadım", "simge": "✗"},
+    {"anahtar": "alinmadi", "ad": "Yoklama alınmadı", "simge": "–"},
+    {"anahtar": "iptal", "ad": "Ders iptal", "simge": "⊘"},
+]
+
 # GPA hesabında dersin hangi kredisi kullanılır? (Dönem ekranındaki ayar; varsayılan ilki.)
 KREDI_BIRIMLERI = [
     {"anahtar": "kredi", "ad": "Kredi"},
@@ -179,6 +203,21 @@ EN_FAZLA_AGIRLIK = 200
 TAM_SAAT_KALIBI = re.compile(r"^([01]\d|2[0-3]):00$")
 
 app = Flask(__name__)
+
+
+def simdi():
+    """ "Şimdi": Mac'in yerel saati (UTC değil).
+
+    Sadece test için: DERSTAKIP_NOW ortam değişkeni (ör. 2026-10-14T16:00) verilmişse o kullanılır.
+    """
+    test_zamani = os.environ.get("DERSTAKIP_NOW")
+    if test_zamani:
+        try:
+            return datetime.fromisoformat(test_zamani)
+        except ValueError:
+            pass
+    return datetime.now()
+
 # Bundan büyük istekler baştan reddedilir (dosya + küçük bir pay).
 app.config["MAX_CONTENT_LENGTH"] = (SYLLABUS_EN_FAZLA_MB + 1) * 1024 * 1024
 
@@ -221,7 +260,8 @@ def veritabani_hazirla():
             ad                TEXT,
             kredi             REAL NOT NULL,
             akts              REAL,
-            devamsizlik_hakki REAL,               -- yüzde, ör. 30
+            devamsizlik_hakki REAL,               -- izin verilen EN FAZLA devamsızlık yüzdesi, ör. 30
+            lab_devamsizlik_hakki REAL,           -- lab için ayrı sınır (yüzde); boşsa teori ve lab birlikte sayılır
             renk              TEXT NOT NULL,      -- RENKLER listesindeki anahtar
             notlar            TEXT,               -- formda yok; sağ paneldeki "Notlar" sekmesinden yazılır
             hedef_not         TEXT,               -- "AA", "BA" ... (eski derslerde boş olabilir)
@@ -275,6 +315,17 @@ def veritabani_hazirla():
             bitis     TEXT NOT NULL               -- tek günse başlangıçla aynı
         );
 
+        -- Yoklama: bir oturumun belirli bir tarihteki dersi için durum. Oturum (ya da dersi)
+        -- silinince kayıtları da silinir.
+        CREATE TABLE IF NOT EXISTS yoklamalar (
+            id          INTEGER PRIMARY KEY,
+            oturum_id   INTEGER NOT NULL REFERENCES oturumlar(id) ON DELETE CASCADE,
+            tarih       TEXT NOT NULL,            -- dersin yapıldığı gün, "2026-10-05"
+            durum       TEXT NOT NULL,            -- YOKLAMA_DURUMLARI listesindeki anahtar
+            guncellenme TEXT NOT NULL,            -- son değişiklik zamanı
+            UNIQUE (oturum_id, tarih)
+        );
+
         -- GPA ayarları (dönemden bağımsız, tek kayıt, id hep 1).
         CREATE TABLE IF NOT EXISTS gpa_ayarlari (
             id           INTEGER PRIMARY KEY CHECK (id = 1),
@@ -317,6 +368,7 @@ def veritabani_guncelle(baglanti):
     sutun_yoksa_ekle(baglanti, "degerlendirmeler", "alinan_puan", "REAL")
     # Mevcut bütün dersler GPA'ya dahil (1) sayılır.
     sutun_yoksa_ekle(baglanti, "dersler", "gpaya_dahil", "INTEGER NOT NULL DEFAULT 1")
+    sutun_yoksa_ekle(baglanti, "dersler", "lab_devamsizlik_hakki", "REAL")
 
     silinenler = []
     # "with baglanti": içindeki işlemler tek seferde kaydedilir, hata olursa hiçbiri kaydedilmez.
@@ -481,21 +533,23 @@ def dersi_kaydet(baglanti, ders, ders_id=None):
     yazılırlar; mevcut değerler aynen kalır).
     "devamsizlik_metni" sadece ders eklenirken yazılır (syllabus'tan gelir), güncellemede aynen kalır.
     """
-    degerler = [ders["kod"], ders["ad"], ders["kredi"], ders["akts"],
-                ders["devamsizlik_hakki"], ders["renk"], ders["hedef_not"]]
+    degerler = [ders["kod"], ders["ad"], ders["kredi"], ders["akts"], ders["devamsizlik_hakki"],
+                ders["lab_devamsizlik_hakki"], ders["renk"], ders["hedef_not"]]
     if ders_id is None:
         imlec = baglanti.execute(
-            "INSERT INTO dersler (kod, ad, kredi, akts, devamsizlik_hakki, renk, hedef_not,"
-            " devamsizlik_metni) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO dersler (kod, ad, kredi, akts, devamsizlik_hakki, lab_devamsizlik_hakki,"
+            " renk, hedef_not, devamsizlik_metni) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             degerler + [ders["devamsizlik_metni"]],
         )
         ders_id = imlec.lastrowid
     else:
         baglanti.execute(
             "UPDATE dersler SET kod = ?, ad = ?, kredi = ?, akts = ?,"
-            " devamsizlik_hakki = ?, renk = ?, hedef_not = ? WHERE id = ?",
+            " devamsizlik_hakki = ?, lab_devamsizlik_hakki = ?, renk = ?, hedef_not = ? WHERE id = ?",
             degerler + [ders_id],
         )
+    # Oturumlar kimlikleriyle yerinde güncellenir (silinip yeniden oluşturulmaz); böylece
+    # yoklama kayıtları oturumuna bağlı kalır. Sadece formdan çıkarılan oturum silinir.
     alt_satirlari_esitle(baglanti, "oturumlar",
                          ["gun", "baslangic", "bitis", "derslik", "tur"],
                          ders_id, ders["oturumlar"])
@@ -557,8 +611,12 @@ def dersi_dogrula(veri):
         kredi = sayiya_cevir(veri.get("kredi"))
         akts = sayiya_cevir(veri.get("akts"))
         devamsizlik_hakki = sayiya_cevir(veri.get("devamsizlik_hakki"))
+        lab_devamsizlik_hakki = sayiya_cevir(veri.get("lab_devamsizlik_hakki"))
     except ValueError:
         return None, "Kredi, AKTS ve devamsızlık hakkı sayı olmalı."
+    for hak in (devamsizlik_hakki, lab_devamsizlik_hakki):
+        if hak is not None and not 0 <= hak <= 100:
+            return None, "Devamsızlık hakkı %0 ile %100 arasında olmalı."
 
     kod = metin(veri.get("kod"))
     if not kod:
@@ -636,6 +694,7 @@ def dersi_dogrula(veri):
         "kredi": kredi,
         "akts": akts,
         "devamsizlik_hakki": devamsizlik_hakki,
+        "lab_devamsizlik_hakki": lab_devamsizlik_hakki,
         "renk": renk,
         "hedef_not": hedef_not,
         "devamsizlik_metni": metin(veri.get("devamsizlik_metni")) or None,
@@ -717,16 +776,29 @@ def syllabus_forma_cevir(ham):
         "kredi": syllabus_sayisi(ham.get("kredi")),
         "akts": syllabus_sayisi(ham.get("akts")),
         "devamsizlik_hakki": syllabus_sayisi(ham.get("devamsizlik_yuzde"), en_fazla=100),
+        "lab_devamsizlik_hakki": syllabus_sayisi(ham.get("lab_devamsizlik_yuzde"), en_fazla=100),
         "devamsizlik_metni": metin(ham.get("devamsizlik_metni")) or None,
         "oturumlar": [],
         "degerlendirmeler": [],
         "isaretler": {},
     }
+    # Belgede devamsızlık hakkı yerine katılım zorunluluğu yazıyorsa (ör. "en az %70 katılım"):
+    # devamsızlık hakkı = 100 - zorunlu katılım. Hesap burada yapılır (modele bırakılmaz) ve alan işaretlenir.
+    for hak_alani, katilim_alani in (("devamsizlik_hakki", "zorunlu_katilim_yuzde"),
+                                     ("lab_devamsizlik_hakki", "lab_zorunlu_katilim_yuzde")):
+        zorunlu_katilim = syllabus_sayisi(ham.get(katilim_alani), en_fazla=100)
+        if ders[hak_alani] is None and zorunlu_katilim is not None:
+            ders[hak_alani] = 100 - zorunlu_katilim
+            isaret_ekle(ders["isaretler"], hak_alani,
+                        f"katılım zorunluluğundan hesaplandı (belgede en az %{zorunlu_katilim:g} katılım)")
     # Modelin emin olmadığı (ve dolu gelen) alanlar sarı işaretlenir.
-    form_alanlari = {"devamsizlik_yuzde": "devamsizlik_hakki"}
+    form_alanlari = {"devamsizlik_yuzde": "devamsizlik_hakki", "zorunlu_katilim_yuzde": "devamsizlik_hakki",
+                     "lab_devamsizlik_yuzde": "lab_devamsizlik_hakki",
+                     "lab_zorunlu_katilim_yuzde": "lab_devamsizlik_hakki"}
     for alan in emin_olmayanlar(ham):
         alan = form_alanlari.get(alan, alan)
-        if ders.get(alan) is not None and alan in ("kod", "ad", "kredi", "akts", "devamsizlik_hakki"):
+        if ders.get(alan) is not None and alan in ("kod", "ad", "kredi", "akts", "devamsizlik_hakki",
+                                                   "lab_devamsizlik_hakki"):
             isaret_ekle(ders["isaretler"], alan, "model emin değil")
 
     oturum_turleri = [tur["anahtar"] for tur in OTURUM_TURLERI]
@@ -823,7 +895,7 @@ def syllabus_forma_cevir(ham):
 
 @app.route("/")
 def ana_sayfa():
-    bugun = date.today()
+    bugun = simdi().date()
     return render_template(
         "index.html",
         bugun_yazisi=bugun.strftime("%d/%m"),
@@ -838,6 +910,7 @@ def ana_sayfa():
         degerlendirme_turleri=DEGERLENDIRME_TURLERI,
         en_fazla_agirlik=EN_FAZLA_AGIRLIK,
         ders_disi_turleri=DERS_DISI_TURLERI,
+        yoklama_durumlari=YOKLAMA_DURUMLARI,
         kredi_birimleri=KREDI_BIRIMLERI,
         # JavaScript'in ihtiyaç duyduğu ayarlar (sayfaya JSON olarak yazılır).
         ayarlar={
@@ -853,6 +926,11 @@ def ana_sayfa():
             "roundMode": ROUND_MODE,
             "gpaRounding": GPA_ROUNDING,
             "dersDisiTurleri": DERS_DISI_TURLERI,
+            "yoklamaDurumlari": YOKLAMA_DURUMLARI,
+            "yoklamaBirimi": ATTENDANCE_UNIT,
+            "limitYuvarlama": LIMIT_ROUNDING,
+            "uyariKalanBirim": UYARI_KALAN_BIRIM,
+            "uyariKullanimOrani": UYARI_KULLANIM_ORANI,
         },
     )
 
@@ -1044,6 +1122,53 @@ def api_donemi_sil():
         baglanti.execute("DELETE FROM ders_disi_tarihler")
     baglanti.close()
     return jsonify({"silindi": True})
+
+
+# ---------- Yoklama ----------
+
+@app.route("/api/yoklama", methods=["GET"])
+def api_yoklamayi_getir():
+    """Devamsızlık hesabı için gereken her şeyi döndürür: şimdiki zaman, dönem, ders yapılmayan
+    tarihler ve bütün yoklama kayıtları. Hesap tarayıcıda yapılır (static/yoklama.js)."""
+    baglanti = veritabani_baglan()
+    sonuc = donemi_getir(baglanti)
+    sonuc["kayitlar"] = [dict(satir) for satir in baglanti.execute(
+        "SELECT oturum_id, tarih, durum FROM yoklamalar ORDER BY tarih, oturum_id"
+    )]
+    baglanti.close()
+    sonuc["simdi"] = simdi().strftime("%Y-%m-%dT%H:%M")
+    return jsonify(sonuc)
+
+
+@app.route("/api/yoklama", methods=["PUT"])
+def api_yoklamayi_kaydet():
+    """Bir ya da birkaç yoklama kaydını yazar. Aynı oturum ve tarih için kayıt varsa durumu değişir."""
+    veri = request.get_json(silent=True) or {}
+    kayitlar = veri.get("kayitlar")
+    durumlar = [durum["anahtar"] for durum in YOKLAMA_DURUMLARI]
+    if not isinstance(kayitlar, list) or not kayitlar:
+        return jsonify({"hata": "Kaydedilecek yoklama yok."}), 400
+    for kayit in kayitlar:
+        if (not isinstance(kayit, dict) or not isinstance(kayit.get("oturum_id"), int)
+                or not tarih_gecerli_mi(metin(kayit.get("tarih"))) or kayit.get("durum") not in durumlar):
+            return jsonify({"hata": "Geçersiz yoklama kaydı."}), 400
+    zaman = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    baglanti = veritabani_baglan()
+    try:
+        with baglanti:
+            for kayit in kayitlar:
+                baglanti.execute(
+                    "INSERT INTO yoklamalar (oturum_id, tarih, durum, guncellenme) VALUES (?, ?, ?, ?)"
+                    " ON CONFLICT (oturum_id, tarih) DO UPDATE SET durum = excluded.durum,"
+                    " guncellenme = excluded.guncellenme",
+                    (kayit["oturum_id"], kayit["tarih"], kayit["durum"], zaman),
+                )
+    except sqlite3.IntegrityError:
+        # Oturum bu arada silinmiş olabilir.
+        baglanti.close()
+        return jsonify({"hata": "Oturum bulunamadı; sayfayı yenileyip tekrar dene."}), 404
+    baglanti.close()
+    return jsonify({"kaydedildi": len(kayitlar)})
 
 
 def gpa_ayarlarini_getir(baglanti):

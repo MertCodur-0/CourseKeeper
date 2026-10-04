@@ -26,6 +26,9 @@
     --sonuc-sari-zemin: #fff4cc;      /* hedefe ulaşılmadı */
     --sonuc-sari-cerceve: #e6c455;
     --sonuc-sari-yazi: #6b4a00;
+    --sonuc-kirmizi-zemin: #fde8e8;   /* devamsızlık hakkı bitti / sınır aşıldı */
+    --sonuc-kirmizi-cerceve: #f0a3a3;
+    --sonuc-kirmizi-yazi: #8f1d1d;
 
     --tamam-yazi: #2b8a3e;        /* "Toplam: %100" yazısı (yeşil) */
     --uyari-cerceve: #e0a800;     /* sarı işaretli (kontrol edilecek) alanın çerçevesi */
@@ -89,6 +92,8 @@ body {
 
 .panel-bos {
     display: flex;
+    flex-direction: column;
+    gap: 16px;
     align-items: center;
     justify-content: center;
     padding: 24px;
@@ -1371,4 +1376,270 @@ body {
     align-items: center;
     gap: 8px;
     margin-top: 12px;
+}
+
+/* ============================================================
+   DEVAMSIZLIK (YOKLAMA)
+   ============================================================ */
+
+/* Ders formundaki alanın altındaki küçük gri açıklama */
+.alan-aciklamasi {
+    font-size: 11.5px;
+    color: var(--soluk-yazi);
+}
+
+/* Yazı gibi görünen buton (uyarı kartlarındaki bağlantılar) */
+.baglanti {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--vurgu);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.donem-uyari-karti {
+    margin: 0;
+    text-align: left;
+}
+
+/* Gezinme satırındaki "Yoklama: N bekliyor" kapsülü */
+.hafta-gezinme .yoklama-kapsulu {
+    border-color: var(--uyari-cerceve);
+    border-radius: 999px;
+    background: var(--uyari-zemin);
+    color: var(--uyari-yazi);
+}
+
+/* ---------- Takvimdeki yoklama simgesi: bloğun çekirdek alanının sol üst köşesinde ---------- */
+
+.yoklama-simgesi {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.45);
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    pointer-events: auto;         /* üzerine gelince durumu yazan ipucu çıksın */
+}
+
+/* Geçmişte kalmış ama yoklaması girilmemiş oturum: sarı "?" */
+.yoklama-simgesi.bekliyor {
+    background: #f5c518;
+    color: #2b2b2b;
+}
+
+/* İptal edilen ders yarı saydam görünür. */
+.ders-blogu.iptal {
+    opacity: 0.5;
+}
+
+/* ---------- Yoklama penceresi ---------- */
+
+.yoklama-penceresi {
+    width: min(760px, 94vw);
+}
+
+.yoklama-listesi {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-height: 60vh;
+    margin-bottom: 16px;
+    overflow-y: auto;
+    font-size: 13px;
+    scrollbar-width: thin;
+}
+
+.yoklama-grubu h3 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 6px;
+    font-size: 13px;
+}
+
+.yoklama-satiri {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    padding: 7px 0;
+    border-top: 1px solid var(--cizgi);
+}
+
+.yoklama-satiri .renk-noktasi {
+    margin-top: 0;
+}
+
+.yoklama-bilgisi {
+    flex: 1;
+    min-width: 180px;
+}
+
+.yoklama-bilgisi small {
+    color: var(--soluk-yazi);
+}
+
+/* Dört durumlu seçici (pencerede yazılı, panelde sadece simge) */
+.durum-secici {
+    display: flex;
+    gap: 4px;
+}
+
+.durum-secici button {
+    padding: 4px 9px;
+    border: 1px solid var(--cerceve);
+    border-radius: 7px;
+    background: var(--yuzey);
+    color: var(--baslik-rengi);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.durum-secici button:hover {
+    border-color: var(--vurgu);
+}
+
+/* Seçili durum: dolu ve kalın */
+.durum-secici button.secili {
+    border-color: var(--baslik-rengi);
+    background: var(--baslik-rengi);
+    color: #ffffff;
+    font-weight: 700;
+}
+
+/* ---------- Sağ panel: Devamsızlık sekmesi ---------- */
+
+.yoklama-karti {
+    padding: 12px;
+    border: 1px solid var(--cerceve);
+    border-radius: 10px;
+    background: var(--yuzey);
+}
+
+.yoklama-karti h3 {
+    margin: 0 0 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--soluk-yazi);
+}
+
+.yoklama-karti p {
+    margin: 6px 0 0;
+}
+
+/* Büyük değer: basınca yüzde ile saat arasında değişir. */
+.katilim-degeri {
+    display: block;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 19px;
+    font-weight: 700;
+    line-height: 1.3;
+    text-align: left;
+    cursor: pointer;
+}
+
+.katilim-degeri small {
+    display: block;
+    font-size: 10.5px;
+    font-weight: 400;
+    color: var(--soluk-yazi);
+}
+
+.katilim-yok {
+    font-size: 17px;
+    font-weight: 700;
+}
+
+/* Sınır bölümü: ilerleme çubuğu ve "Kullanılan X / Y". Rengi duruma göre. */
+.sinir-durumu {
+    margin-top: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--cerceve);
+    border-radius: 8px;
+}
+
+.sinir-durumu.yesil {
+    border-color: var(--sonuc-yesil-cerceve);
+    background: var(--sonuc-yesil-zemin);
+    color: var(--sonuc-yesil-yazi);
+}
+
+.sinir-durumu.sari {
+    border-color: var(--sonuc-sari-cerceve);
+    background: var(--sonuc-sari-zemin);
+    color: var(--sonuc-sari-yazi);
+}
+
+.sinir-durumu.kirmizi {
+    border-color: var(--sonuc-kirmizi-cerceve);
+    background: var(--sonuc-kirmizi-zemin);
+    color: var(--sonuc-kirmizi-yazi);
+}
+
+.sinir-durumu strong {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sinir-durumu p {
+    margin: 4px 0 0;
+    font-size: 12px;
+}
+
+.ilerleme {
+    height: 5px;
+    margin-bottom: 7px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.ilerleme span {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+    background: currentColor;
+}
+
+.gecmis-oturumlar h3 {
+    margin: 4px 0 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--soluk-yazi);
+}
+
+.gecmis-satiri {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px 0;
+    border-top: 1px solid var(--cizgi);
+}
+
+.gecmis-satiri small {
+    display: block;
+    color: var(--soluk-yazi);
+}
+
+.gecmis-satiri .durum-secici button {
+    width: 26px;
+    padding: 3px 0;
 }
