@@ -63,6 +63,8 @@ Requirements: macOS, Python 3 and (for reading syllabi and academic calendars) a
 
    > If macOS won't let you open the file: right-click it → **Open**.
 
+4. **Optional: install it as a Mac app.** Double-click `uygulamayi_kur.command`. It creates `CourseKeeper.app` (with its own icon) in your Applications folder and puts a shortcut on your desktop. Drag it to the Dock if you like. The app starts CourseKeeper in the background without a Terminal window and opens it in your browser; quitting the app (⌘Q) stops it. If you move or rename the project folder, run the installer again.
+
 To start it from the terminal instead:
 ```bash
 python3 -m venv venv

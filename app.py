@@ -1621,5 +1621,8 @@ def api_ders_sil(ders_id):
 
 if __name__ == "__main__":
     veritabani_hazirla()
+    # Geliştirici modu (kod değişince sunucu kendini yeniler, hata ayrıntısı gösterir) varsayılan olarak açık.
+    # Mac uygulaması (CourseKeeper.app) günlük kullanım için COURSEKEEPER_DEBUG=0 ile kapatır.
+    gelistirici_modu = os.environ.get("COURSEKEEPER_DEBUG", "1") != "0"
     # 127.0.0.1: uygulamaya sadece bu Mac'ten erişilebilir.
-    app.run(host="127.0.0.1", port=PORT, debug=True)
+    app.run(host="127.0.0.1", port=PORT, debug=gelistirici_modu)

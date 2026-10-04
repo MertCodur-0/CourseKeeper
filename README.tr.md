@@ -58,6 +58,8 @@ Gerekenler: macOS, Python 3 ve (syllabus/akademik takvim okumak için) bir Gemin
 
    > macOS dosyayı açmana izin vermezse: dosyaya sağ tıkla → **Aç**.
 
+4. **İsteğe bağlı: Mac uygulaması olarak kur.** `uygulamayi_kur.command` dosyasına çift tıkla. Uygulamalar klasörüne kendi simgesiyle `CourseKeeper.app` oluşturur ve masaüstüne kısayol koyar; istersen Dock'a sürükle. Uygulama CourseKeeper'ı Terminal penceresi açmadan arka planda başlatır ve tarayıcıda açar; uygulamadan çıkınca (⌘Q) kapanır. Proje klasörünü taşır ya da adını değiştirirsen kurulumu yeniden çalıştır.
+
 Terminalden başlatmak istersen:
 ```bash
 python3 -m venv venv

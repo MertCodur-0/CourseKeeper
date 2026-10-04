@@ -15,3 +15,6 @@ __pycache__/
 
 # Hava durumu önbelleği (kendiliğinden oluşur)
 hava_onbellek.json
+
+# Mac uygulamasının başlattığı sunucunun kimliği
+.coursekeeper.pid
