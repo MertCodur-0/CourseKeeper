@@ -1,5 +1,5 @@
 #!/bin/zsh
-# DersTakip'i başlatır: çift tıklayınca sunucu açılır ve tarayıcıda uygulama görünür.
+# CourseKeeper'ı başlatır: çift tıklayınca sunucu açılır ve tarayıcıda uygulama görünür.
 
 # Bu dosyanın bulunduğu klasöre (proje klasörüne) geç.
 cd "$(dirname "$0")"
@@ -16,6 +16,6 @@ venv/bin/pip install --quiet -r requirements.txt
 # Sunucu açılınca tarayıcıyı aç (2 saniye bekleyip).
 (sleep 2 && open "http://127.0.0.1:5001") &
 
-echo "DersTakip çalışıyor: http://127.0.0.1:5001"
+echo "CourseKeeper çalışıyor: http://127.0.0.1:5001"
 echo "Kapatmak için bu pencerede Ctrl+C'ye bas."
 venv/bin/python app.py

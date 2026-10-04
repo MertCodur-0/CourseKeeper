@@ -1,4 +1,4 @@
-# DersTakip
+# CourseKeeper
 
 **English** | [Türkçe](README.tr.md)
 
@@ -46,8 +46,8 @@ Requirements: macOS, Python 3 and (for reading syllabi and academic calendars) a
 
 1. Clone the project:
    ```bash
-   git clone https://github.com/MertCodur-0/DersTakip.git
-   cd DersTakip
+   git clone https://github.com/MertCodur-0/CourseKeeper.git
+   cd CourseKeeper
    ```
 
 2. Create the settings file:

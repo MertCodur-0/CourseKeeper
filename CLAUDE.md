@@ -1,5 +1,6 @@
-# DersTakip
+# CourseKeeper
 Kişisel akademik takip uygulaması. Mac'te yerelde çalışır.
+- Proje adı CourseKeeper (eski adı DersTakip). Veritabanı dosyası (derstakip.db), yedek dosya adları, localStorage anahtarları (derstakip.*) ve DERSTAKIP_NOW eski adla kalır; mevcut veriler ve ayarlar kaybolmasın diye bunlar değiştirilmez.
 - Python (Flask) + SQLite + sade HTML/JavaScript. Ağır framework kullanma.
 - Veriler proje klasöründeki SQLite dosyasında tutulur.
 - İnternet sadece syllabus okuma (Gemini API) için kullanılır.

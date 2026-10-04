@@ -1,4 +1,4 @@
-// DersTakip'in tarayıcı tarafı: dersleri sunucudan alır, takvime blok olarak
+// CourseKeeper'ın tarayıcı tarafı: dersleri sunucudan alır, takvime blok olarak
 // çizer, ders ekleme/düzenleme formunu ve sağ paneli (not hesabı, notlar, bilgi) yönetir.
 
 // ============================================================

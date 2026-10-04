@@ -365,7 +365,7 @@ def _istek_gonder(parcalar, alan_adi, port, ip):
     try:
         yol = (parcalar.path or "/") + (f"?{parcalar.query}" if parcalar.query else "")
         baglanti.request("GET", yol, headers={
-            "User-Agent": "DersTakip/1.0 (akademik takvim okuyucu)",
+            "User-Agent": "CourseKeeper/1.0 (akademik takvim okuyucu)",
             "Accept": "text/html,application/pdf;q=0.9",
             "Accept-Encoding": "identity",
         })

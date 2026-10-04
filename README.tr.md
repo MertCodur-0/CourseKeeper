@@ -1,4 +1,4 @@
-# DersTakip
+# CourseKeeper
 
 [English](README.md) | **Türkçe**
 
@@ -44,8 +44,8 @@ Gerekenler: macOS, Python 3 ve (syllabus/akademik takvim okumak için) bir Gemin
 
 1. Projeyi indir:
    ```bash
-   git clone https://github.com/MertCodur-0/DersTakip.git
-   cd DersTakip
+   git clone https://github.com/MertCodur-0/CourseKeeper.git
+   cd CourseKeeper
    ```
 
 2. Ayar dosyasını oluştur:
