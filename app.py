@@ -8,6 +8,7 @@ from pathlib import Path
 from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
+import akademik_takvim
 import syllabus
 from syllabus import SyllabusHatasi
 
@@ -1292,6 +1293,56 @@ def api_syllabus_oku():
         app.logger.error("Syllabus okunurken beklenmeyen hata: %s", type(hata).__name__)
         return jsonify({"hata": "Syllabus okunurken beklenmeyen bir hata oluştu."}), 500
     return jsonify({"ders": ders, "uyarilar": uyarilar})
+
+
+@app.route("/api/akademik-takvim", methods=["POST"])
+def api_akademik_takvimi_oku():
+    """Akademik takvimi bir sayfa adresinden ("adres") ya da yüklenen dosyadan ("dosya") okur.
+
+    Hiçbir şey kaydetmez: sonuç Dönem ekranındaki formu ön doldurur, kullanıcı Kaydet'e basınca
+    kaydedilir. Adres ve dosya saklanmaz, kayıtlara yazılmaz. Dosya kuralları syllabus ile aynıdır.
+    Her hata {"hata": mesaj} olarak döner; uygulama çökmez.
+    """
+    en_fazla = SYLLABUS_EN_FAZLA_MB * 1024 * 1024
+    boyut_mesaji = f"Dosya çok büyük. En fazla {SYLLABUS_EN_FAZLA_MB} MB'lık dosya yükleyebilirsin."
+    notlar = []
+    try:
+        dosya = request.files.get("dosya")
+        adres = metin(request.form.get("adres"))
+        # Anahtar eksikse sayfa hiç indirilmeden haber verilsin.
+        parser = syllabus.parser_olustur(ENV_DOSYASI)
+        if dosya is not None:
+            try:
+                icerik = dosya.read(en_fazla + 1)
+            finally:
+                dosya.close()
+            if len(icerik) > en_fazla:
+                raise SyllabusHatasi(boyut_mesaji)
+            mime_turu = dosya_turunu_bul(icerik)
+            if mime_turu is None:
+                raise SyllabusHatasi("Bu dosya türü desteklenmiyor. Lütfen PDF, PNG veya JPG dosyası seç.")
+            ham = akademik_takvim.takvimi_oku(parser, dosya_icerigi=icerik, mime_turu=mime_turu)
+        elif adres:
+            icerik, icerik_turu, kodlama = akademik_takvim.sayfayi_indir(adres)
+            if icerik_turu == "application/pdf":
+                ham = akademik_takvim.takvimi_oku(parser, dosya_icerigi=icerik, mime_turu=icerik_turu)
+            else:
+                sayfa_metni, kisaltildi = akademik_takvim.html_metne_cevir(icerik, kodlama)
+                if kisaltildi:
+                    notlar.append("Sayfa uzun olduğu için kısaltıldı; sondaki tarihler eksik olabilir.")
+                ham = akademik_takvim.takvimi_oku(parser, sayfa_metni=sayfa_metni)
+        else:
+            raise SyllabusHatasi("Bir sayfa adresi yaz ya da dosya seç.")
+        donemler = akademik_takvim.takvimi_temizle(ham)
+    except SyllabusHatasi as hata:
+        return jsonify({"hata": str(hata)}), 400
+    except RequestEntityTooLarge:
+        return jsonify({"hata": boyut_mesaji}), 413
+    except Exception as hata:
+        # Beklenmeyen hata: ayrıntı (adres, anahtar gibi bilgiler) kullanıcıya ya da kayda yazılmaz.
+        app.logger.error("Akademik takvim okunurken beklenmeyen hata: %s", type(hata).__name__)
+        return jsonify({"hata": "Akademik takvim okunurken beklenmeyen bir hata oluştu."}), 500
+    return jsonify({"donemler": donemler, "notlar": notlar})
 
 
 @app.route("/api/dersler/<int:ders_id>", methods=["DELETE"])

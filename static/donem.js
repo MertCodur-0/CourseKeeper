@@ -11,6 +11,9 @@
 let kayitliDonemVar = false;   // sunucuda kayıtlı bir dönem var mı
 let donemAnlik = "";           // akademik takvim formunun son kaydedilmiş hali (değişiklik var mı diye)
 let simulasyon = {};           // GPA simülasyonu: {ders kimliği: denenen harf}. Kaydedilmez.
+let okunanDonemler = [];       // "Akademik takvimden doldur" ile okunan dönemler (forma uygulanmayı bekler)
+let okumaNotlari = [];         // okumayla ilgili notlar (ör. "Sayfa uzun olduğu için kısaltıldı")
+let takvimOkumaNo = 0;         // her okumanın numarası (pencere kapanınca eski okuma yok sayılır)
 
 const donemPenceresi = document.getElementById("donem-penceresi");
 const donemSekmeleri = document.getElementById("donem-sekmeleri");
@@ -86,17 +89,19 @@ function gunNumarasi(tarih) {
     return Date.UTC(yil, ay - 1, gun) / 86400000;
 }
 
-// Ders yapılmayan tarihler listesine bir satır ekler.
+// Ders yapılmayan tarihler listesine bir satır ekler ve eklenen satırı döndürür.
 function dersDisiSatiriEkle(veri = {}) {
     const satir = document.getElementById("ders-disi-sablonu").content.firstElementChild.cloneNode(true);
     satir.querySelectorAll("[data-alan]").forEach((alan) => {
         if (veri[alan.dataset.alan] != null) alan.value = veri[alan.dataset.alan];
     });
     dersDisiListesi.appendChild(satir);
+    return satir;
 }
 
 // Formu sunucudan gelen dönemle doldurur (dönem yoksa boş form).
 function donemFormunuDoldur(veri) {
+    okunanTakvimiTemizle();   // akademik takvimden okunup kaydedilmemiş ne varsa bırakılır
     const donem = veri.donem || {};
     kayitliDonemVar = veri.donem !== null;
     for (const ad of ["ad", "baslangic", "bitis", "final_baslangic", "final_bitis"]) {
@@ -220,6 +225,212 @@ async function donemiSil() {
     } catch (hata) {
         mesajGoster(donemHatasi, hata.message);
     }
+}
+
+// ============================================================
+// AKADEMİK TAKVİMDEN DOLDUR
+// Sayfa adresi ya da dosya sunucuya gider, sunucu Gemini ile okur (anahtar tarayıcıya gelmez).
+// Sonuç yukarıdaki formu ön doldurur; Kaydet'e basılana kadar hiçbir şey kaydedilmez.
+// ============================================================
+
+const takvimDoldurPenceresi = document.getElementById("takvim-doldur-penceresi");
+const takvimDoldurIcerigi = document.getElementById("takvim-doldur-icerigi");
+const takvimOkunuyor = document.getElementById("takvim-okunuyor");
+const takvimOkumaHatasi = document.getElementById("takvim-okuma-hatasi");
+const takvimNotu = document.getElementById("takvim-notu");
+const takvimBirakma = document.getElementById("takvim-birakma");
+const takvimDosyasi = document.getElementById("takvim-dosyasi");
+const sinavDonemleriBolumu = document.getElementById("sinav-donemleri-bolumu");
+
+function takvimDoldurSekmesiniGoster(ad) {
+    document.querySelectorAll("#takvim-doldur-sekmeleri button").forEach((dugme) => {
+        dugme.classList.toggle("secili", dugme.dataset.sekme === ad);
+    });
+    takvimDoldurIcerigi.querySelectorAll(":scope > [data-sekme]").forEach((sekme) => {
+        sekme.hidden = sekme.dataset.sekme !== ad;
+    });
+}
+
+function takvimDoldurPenceresiniAc() {
+    mesajGoster(takvimOkumaHatasi, "");
+    takvimOkunuyorGoster(false);
+    takvimDoldurSekmesiniGoster("adres");
+    takvimDoldurPenceresi.showModal();
+}
+
+// "Okunuyor..." göstergesini açar/kapatır (açıkken adres ve dosya alanları gizlenir).
+function takvimOkunuyorGoster(acik) {
+    takvimOkunuyor.hidden = !acik;
+    takvimDoldurIcerigi.hidden = acik;
+}
+
+// Adresi ya da dosyayı (FormData içinde) sunucuya gönderir; sonuç gelince forma uygular.
+async function takvimiOku(veri) {
+    const buOkuma = ++takvimOkumaNo;
+    mesajGoster(takvimOkumaHatasi, "");
+    takvimOkunuyorGoster(true);
+    let sonuc;
+    let hata = null;
+    try {
+        const yanit = await fetch("/api/akademik-takvim", { method: "POST", body: veri });
+        sonuc = await yanit.json();
+        if (!yanit.ok) hata = sonuc.hata || "Akademik takvim okunamadı.";
+    } catch {
+        hata = "Sunucuya ulaşılamadı ya da yanıt anlaşılamadı. Sunucunun çalıştığından emin olup tekrar dene.";
+    }
+    // Bu arada pencere kapatıldıysa ya da başka bir okuma başladıysa sonucu yok say.
+    if (buOkuma !== takvimOkumaNo || !takvimDoldurPenceresi.open) return;
+    takvimOkunuyorGoster(false);
+    if (hata) {
+        mesajGoster(takvimOkumaHatasi, hata + " Tarihleri formdan elle de girebilirsin.");
+        return;
+    }
+
+    // Formda ya da kayıtta dönem bilgisi varsa üzerine yazmadan önce sor. Vazgeçilirse hiçbir şey değişmez.
+    const mevcut = donemFormunuOku();
+    const doluMu = kayitliDonemVar || mevcut.baslangic !== "" || mevcut.bitis !== "" || mevcut.ders_disi_tarihler.length > 0;
+    if (doluMu && !confirm("Mevcut dönem ve tatil listesi değiştirilecek, devam edilsin mi?")) {
+        takvimDoldurPenceresi.close();
+        return;
+    }
+    takvimDoldurPenceresi.close();
+    okunanDonemler = sonuc.donemler;
+    okumaNotlari = sonuc.notlar || [];
+    okunanDonemiUygula(varsayilanDonem());
+}
+
+// Seçilen dosyayı kontrol edip okutur (syllabus ile aynı kurallar: PDF/PNG/JPG, en fazla 20 MB).
+function takvimDosyasiniOku(dosya) {
+    const turUygun = ["application/pdf", "image/png", "image/jpeg"].includes(dosya.type)
+        || /\.(pdf|png|jpe?g)$/i.test(dosya.name);
+    if (!turUygun) {
+        mesajGoster(takvimOkumaHatasi, "Bu dosya türü desteklenmiyor. Lütfen PDF, PNG veya JPG dosyası seç.");
+        return;
+    }
+    if (dosya.size > AYARLAR.syllabusEnFazlaMB * 1024 * 1024) {
+        mesajGoster(takvimOkumaHatasi, `Dosya çok büyük. En fazla ${AYARLAR.syllabusEnFazlaMB} MB'lık dosya yükleyebilirsin.`);
+        return;
+    }
+    const veri = new FormData();
+    veri.append("dosya", dosya);
+    takvimiOku(veri);
+}
+
+// Belgede birden fazla dönem varsa hangisi önce gösterilsin: bugünü içeren, yoksa bugünden sonra
+// başlayan en yakın dönem, o da yoksa ilki. (Seçimi model yapmaz; kullanıcı listeden değiştirebilir.)
+function varsayilanDonem() {
+    const bugun = AYARLAR.bugun;
+    const icinde = okunanDonemler.findIndex((donem) => donem.baslangic && donem.baslangic <= bugun
+        && bugun <= (donem.final_bitis || donem.bitis || donem.baslangic));
+    if (icinde !== -1) return icinde;
+    let enYakin = -1;
+    okunanDonemler.forEach((donem, sira) => {
+        if (donem.baslangic && donem.baslangic > bugun
+            && (enYakin === -1 || donem.baslangic < okunanDonemler[enYakin].baslangic)) enYakin = sira;
+    });
+    return enYakin === -1 ? 0 : enYakin;
+}
+
+// Okunan dönemlerden birini forma yazar (kaydetmez). Emin olunmayan alanlar sarı işaretlenir;
+// boş kalan zorunlu alanlar (ilk ve son gün) formun kendi kuralıyla kırmızı olur.
+function okunanDonemiUygula(sira) {
+    const donem = okunanDonemler[sira];
+    donemFormu.querySelectorAll(".emin-degil").forEach((alan) => alan.classList.remove("emin-degil"));
+    for (const ad of ["ad", "baslangic", "bitis", "final_baslangic", "final_bitis"]) {
+        donemFormu.elements[ad].value = donem[ad] ?? "";
+    }
+    for (const ad of donem.emin_olmayanlar) {
+        donemFormu.elements[ad].classList.add("emin-degil");
+        donemFormu.elements[ad].title = "model emin değil";
+    }
+    // Tatiller: ders yapılmayan tarihler listesine "Tatil" türüyle.
+    dersDisiListesi.replaceChildren();
+    for (const tatil of donem.tatiller) {
+        const satir = dersDisiSatiriEkle({ tur: "tatil", ...tatil });
+        if (tatil.emin_degil) {
+            satir.querySelectorAll('input[type="date"]').forEach((alan) => {
+                alan.classList.add("emin-degil");
+                alan.title = "model emin değil";
+            });
+        }
+    }
+
+    // Üstteki not: ne okunduğu, (varsa) dönem seçimi ve okuma notları.
+    takvimNotu.replaceChildren();
+    const baslik = eleman("p");
+    baslik.appendChild(eleman("strong", "", "Akademik takvimden okundu, lütfen kontrol et."));
+    takvimNotu.appendChild(baslik);
+    if (okunanDonemler.length > 1) {
+        const secim = eleman("p", "", `Belgede ${okunanDonemler.length} dönem bulundu. Kullanılacak dönem:`);
+        const liste = eleman("select");
+        liste.id = "okunan-donem-secimi";
+        liste.setAttribute("aria-label", "Kullanılacak dönem");
+        okunanDonemler.forEach((d, i) => {
+            const tarih = d.baslangic ? ` (${tarihiGoster(d.baslangic)})` : "";
+            liste.add(new Option((d.ad || `Dönem ${i + 1}`) + tarih, i));
+        });
+        liste.value = sira;
+        liste.addEventListener("change", () => okunanDonemiUygula(Number(liste.value)));
+        secim.appendChild(liste);
+        takvimNotu.appendChild(secim);
+    }
+    takvimNotu.appendChild(eleman("p", "",
+        "Sarı alanlar: modelin emin olmadığı tarihler. Kırmızı alanlar: belgede bulunamadı, sen doldur. "
+        + "Kaydet'e basana kadar hiçbir şey kaydedilmez."));
+    for (const not of okumaNotlari) takvimNotu.appendChild(eleman("p", "", not));
+    takvimNotu.hidden = false;
+
+    // Sınav dönemleri: varsayılan işaretsiz. İşaretlenen, listeye "Sınav dönemi" türüyle eklenir.
+    const sinavListesi = document.getElementById("sinav-donemleri-listesi");
+    sinavListesi.replaceChildren();
+    for (const sinav of donem.sinav_donemleri) {
+        const etiket = eleman("label", "sinav-donemi");
+        const kutu = eleman("input");
+        kutu.type = "checkbox";
+        let yazi = `${sinav.ad || "Sınav dönemi"} · ${tarihiGoster(sinav.baslangic)}`
+            + (sinav.bitis !== sinav.baslangic ? ` – ${tarihiGoster(sinav.bitis)}` : "");
+        if (sinav.emin_degil) yazi += " (model emin değil)";
+        if (sinav.bitis < sinav.baslangic) {
+            yazi += " — tarihler tutarsız (bitiş başlangıçtan önce), listeye eklenemez";
+            kutu.disabled = true;
+        }
+        let eklenenSatir = null;
+        kutu.addEventListener("change", () => {
+            if (kutu.checked) {
+                eklenenSatir = dersDisiSatiriEkle({ tur: "sinav", ad: sinav.ad, baslangic: sinav.baslangic, bitis: sinav.bitis });
+            } else if (eklenenSatir) {
+                eklenenSatir.remove();
+                eklenenSatir = null;
+            }
+            donemiDogrula();
+        });
+        etiket.append(kutu, eleman("span", "", yazi));
+        sinavListesi.appendChild(etiket);
+    }
+    // Final dönemi derslerin son gününden sonra olduğu için listeye girmez; sadece bilgi satırı.
+    const finalBilgisi = document.getElementById("final-bilgisi");
+    finalBilgisi.hidden = !donem.final_baslangic;
+    if (donem.final_baslangic) {
+        finalBilgisi.textContent = `Final dönemi: ${tarihiGoster(donem.final_baslangic)}`
+            + (donem.final_bitis ? ` – ${tarihiGoster(donem.final_bitis)}` : "")
+            + " (derslerin son gününden sonra olduğu için bu listeye eklenmez; yukarıdaki final alanlarına yazıldı).";
+    }
+    sinavDonemleriBolumu.hidden = donem.sinav_donemleri.length === 0 && !donem.final_baslangic;
+
+    donemKayitDurumu.textContent = "";
+    donemiDogrula();
+}
+
+// Akademik takvimden okunup forma yazılanların izlerini (not, sınav dönemleri, sarı işaretler) kaldırır.
+function okunanTakvimiTemizle() {
+    okunanDonemler = [];
+    okumaNotlari = [];
+    takvimNotu.hidden = true;
+    sinavDonemleriBolumu.hidden = true;
+    donemFormu.querySelectorAll(".emin-degil").forEach((alan) => {
+        alan.classList.remove("emin-degil");
+        alan.removeAttribute("title");
+    });
 }
 
 // ============================================================
@@ -519,6 +730,11 @@ donemFormu.addEventListener("input", (olay) => {
         const bitis = olay.target.closest(".satir").querySelector('[data-alan="bitis"]');
         if (bitis.value === "") bitis.value = olay.target.value;
     }
+    // Sarı işaretli (akademik takvimden okunan) alan değiştirildiyse kontrol edilmiş sayılır.
+    if (olay.target.classList.contains("emin-degil")) {
+        olay.target.classList.remove("emin-degil");
+        olay.target.removeAttribute("title");
+    }
     donemKayitDurumu.textContent = "";
     donemiDogrula();
 });
@@ -544,3 +760,40 @@ document.getElementById("simulasyon-sifirla").addEventListener("click", () => {
     gpaCiz();
 });
 document.getElementById("simulasyon-kaydet").addEventListener("click", simulasyonuKaydet);
+
+// Akademik takvimden doldur
+document.getElementById("takvim-doldur").addEventListener("click", takvimDoldurPenceresiniAc);
+document.getElementById("takvim-doldur-kapat").addEventListener("click", () => takvimDoldurPenceresi.close());
+// Pencere kapanınca süren okuma yok sayılır.
+takvimDoldurPenceresi.addEventListener("close", () => { takvimOkumaNo++; });
+document.getElementById("takvim-doldur-sekmeleri").addEventListener("click", (olay) => {
+    const dugme = olay.target.closest("button[data-sekme]");
+    if (dugme) takvimDoldurSekmesiniGoster(dugme.dataset.sekme);
+});
+document.getElementById("takvim-adres-formu").addEventListener("submit", (olay) => {
+    olay.preventDefault();
+    const adres = document.getElementById("takvim-adresi").value.trim();
+    if (adres === "") {
+        mesajGoster(takvimOkumaHatasi, "Bir sayfa adresi yaz.");
+        return;
+    }
+    const veri = new FormData();
+    veri.append("adres", adres);
+    takvimiOku(veri);
+});
+document.getElementById("takvim-dosya-sec").addEventListener("click", () => takvimDosyasi.click());
+takvimDosyasi.addEventListener("change", () => {
+    if (takvimDosyasi.files.length > 0) takvimDosyasiniOku(takvimDosyasi.files[0]);
+    takvimDosyasi.value = "";   // aynı dosya tekrar seçilebilsin
+});
+// Pencereye bırakılan dosyayı tarayıcı kendi açmasın (sayfadan çıkılmasın).
+for (const olayAdi of ["dragover", "drop"]) {
+    takvimDoldurPenceresi.addEventListener(olayAdi, (olay) => olay.preventDefault());
+}
+takvimBirakma.addEventListener("dragover", () => takvimBirakma.classList.add("suruklenen"));
+takvimBirakma.addEventListener("dragleave", () => takvimBirakma.classList.remove("suruklenen"));
+takvimBirakma.addEventListener("drop", (olay) => {
+    takvimBirakma.classList.remove("suruklenen");
+    const dosya = olay.dataTransfer.files[0];
+    if (dosya) takvimDosyasiniOku(dosya);
+});

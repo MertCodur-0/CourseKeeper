@@ -286,6 +286,12 @@
 
             <!-- Sekme: Akademik takvim -->
             <form class="ders-formu donem-sekmesi" id="donem-formu" data-sekme="takvim" novalidate>
+                <div class="takvim-doldur-satiri">
+                    <button type="button" class="dugme" id="takvim-doldur">Akademik takvimden doldur</button>
+                    <small>Üniversitenin takvim sayfasından ya da PDF / görselden okur; kaydetmeden önce sen kontrol edersin.</small>
+                </div>
+                <!-- Sadece akademik takvimden doldurulunca görünür (içeriğini donem.js yazar). -->
+                <div class="mesaj uyari takvim-notu" id="takvim-notu" hidden></div>
                 <div class="alanlar">
                     <label class="alan genis">
                         <span>Dönem adı</span>
@@ -322,6 +328,13 @@
                     </div>
                     <div id="ders-disi-listesi"></div>
                     <button type="button" class="satir-ekle" id="ders-disi-ekle">+ tarih ekle</button>
+                </section>
+
+                <!-- Akademik takvimden okunan sınav dönemleri: işaretlenen, yukarıdaki listeye "Sınav dönemi" olarak eklenir. -->
+                <section class="bolum" id="sinav-donemleri-bolumu" hidden>
+                    <h3>Sınav dönemleri <small>(ders yapılmıyorsa işaretle)</small></h3>
+                    <div id="sinav-donemleri-listesi"></div>
+                    <p class="kucuk-not" id="final-bilgisi" hidden></p>
                 </section>
 
                 <p class="mesaj hata" id="donem-hatasi" hidden></p>
@@ -396,6 +409,43 @@
             <span class="bosluk"></span>
             <button type="button" class="dugme" id="yoklama-sonra">Sonra</button>
         </footer>
+    </dialog>
+
+    <!-- "Akademik takvimden doldur" penceresi: sayfa adresi ya da dosya. Sonuç Akademik takvim
+         formunu ön doldurur; Kaydet'e basılana kadar hiçbir şey kaydedilmez. -->
+    <dialog class="pencere takvim-doldur-penceresi" id="takvim-doldur-penceresi">
+        <header class="pencere-baslik">
+            <h2>Akademik takvimden doldur</h2>
+            <button type="button" class="kapat" id="takvim-doldur-kapat" aria-label="Kapat">×</button>
+        </header>
+        <div class="takvim-doldur-icerigi" id="takvim-doldur-icerigi">
+            <nav class="sekmeler" id="takvim-doldur-sekmeleri">
+                <button type="button" data-sekme="adres">Sayfa adresi</button>
+                <button type="button" data-sekme="dosya">Dosya yükle</button>
+            </nav>
+            <form class="ders-formu" id="takvim-adres-formu" data-sekme="adres" novalidate>
+                <label class="alan">
+                    <span>Akademik takvim sayfasının adresi</span>
+                    <input type="text" inputmode="url" id="takvim-adresi" placeholder="https://www.universite.edu.tr/akademik-takvim" autocomplete="off">
+                </label>
+                <small class="alan-aciklamasi">Giriş gerektirmeyen, herkese açık bir sayfa ya da PDF adresi olmalı.</small>
+                <footer class="pencere-dugmeleri">
+                    <span class="bosluk"></span>
+                    <button type="submit" class="dugme ana">Oku</button>
+                </footer>
+            </form>
+            <div class="birakma-alani" id="takvim-birakma" data-sekme="dosya" hidden>
+                <strong>Akademik takvim dosyasını buraya sürükle</strong>
+                <small>PDF, PNG veya JPG · en fazla {{ ayarlar.syllabusEnFazlaMB }} MB</small>
+                <button type="button" class="dugme ana" id="takvim-dosya-sec">Dosya seç</button>
+                <input type="file" id="takvim-dosyasi" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" hidden>
+            </div>
+        </div>
+        <div class="okunuyor" id="takvim-okunuyor" hidden>
+            <span class="donen-halka"></span>
+            <span>Okunuyor...</span>
+        </div>
+        <p class="mesaj hata" id="takvim-okuma-hatasi" hidden></p>
     </dialog>
 
     <template id="ders-disi-sablonu">

@@ -180,6 +180,13 @@ class SyllabusParser:
         """
         raise NotImplementedError
 
+    def belge_oku(self, talimat, sema, dosya_icerigi=None, mime_turu=None):
+        """Genel okuma: talimatı ve (varsa) dosyayı modele verir, verilen şemaya uyan sözlüğü döndürür.
+
+        Syllabus dışındaki belgeler (ör. akademik takvim) aynı bağlantıyı bununla kullanır.
+        """
+        raise NotImplementedError
+
 
 # ============================================================
 # GEMINI
@@ -197,18 +204,20 @@ class GeminiParser(SyllabusParser):
         self.model = model
 
     def oku(self, dosya_icerigi, mime_turu):
+        return self.belge_oku(talimat_yaz(date.today()), CIKTI_SEMASI, dosya_icerigi, mime_turu)
+
+    def belge_oku(self, talimat, sema, dosya_icerigi=None, mime_turu=None):
+        parcalar = []
+        if dosya_icerigi is not None:
+            parcalar.append({"inline_data": {"mime_type": mime_turu,
+                                             "data": base64.b64encode(dosya_icerigi).decode("ascii")}})
+        parcalar.append({"text": talimat})
         istek_govdesi = {
-            "contents": [{
-                "parts": [
-                    {"inline_data": {"mime_type": mime_turu,
-                                     "data": base64.b64encode(dosya_icerigi).decode("ascii")}},
-                    {"text": talimat_yaz(date.today())},
-                ],
-            }],
+            "contents": [{"parts": parcalar}],
             # Yapılandırılmış çıktı: model sadece bu şemaya uyan JSON döndürür.
             "generationConfig": {
                 "responseMimeType": "application/json",
-                "responseJsonSchema": CIKTI_SEMASI,
+                "responseJsonSchema": sema,
             },
         }
         yanit = self._istek_gonder(istek_govdesi)

@@ -1643,3 +1643,60 @@ body {
     width: 26px;
     padding: 3px 0;
 }
+
+/* ============================================================
+   AKADEMİK TAKVİMDEN DOLDUR
+   ============================================================ */
+.takvim-doldur-satiri {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+}
+
+.takvim-doldur-satiri small {
+    color: var(--soluk-yazi);
+}
+
+/* Formun üstündeki "Akademik takvimden okundu" notu */
+.takvim-notu p {
+    margin: 0 0 4px;
+}
+
+.takvim-notu p:last-child {
+    margin-bottom: 0;
+}
+
+.ders-formu .takvim-notu select {
+    width: auto;
+    max-width: 100%;
+    margin-left: 6px;
+}
+
+/* Sınav dönemi satırı: onay kutusu ve yanında adı ile tarihleri */
+.sinav-donemi {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    cursor: pointer;
+}
+
+.ders-formu .sinav-donemi input[type="checkbox"] {
+    justify-self: auto;
+    flex-shrink: 0;
+}
+
+.takvim-doldur-penceresi {
+    width: min(560px, 94vw);
+}
+
+.takvim-doldur-icerigi {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+#takvim-okuma-hatasi {
+    margin-top: 12px;
+}
