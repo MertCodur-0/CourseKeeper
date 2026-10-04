@@ -747,73 +747,12 @@ body {
 }
 
 
-.ders-paneli {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 16px 16px 0;
-}
-
-.panel-baslik {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-}
-
 .renk-noktasi {
     flex-shrink: 0;
     width: 12px;
     height: 12px;
     margin-top: 4px;
     border-radius: 50%;
-}
-
-.panel-adlar {
-    flex: 1;
-    min-width: 0;
-}
-
-.panel-adlar h2 {
-    margin: 0;
-    font-size: 16px;
-    overflow-wrap: anywhere;
-}
-
-.panel-adlar p,
-.panel-kunye {
-    margin: 2px 0 0;
-    color: var(--soluk-yazi);
-    font-size: 12px;
-}
-
-.panel-kunye {
-    margin: 0;
-}
-
-/* ---------- Sekmeler ---------- */
-
-.sekmeler {
-    display: flex;
-    flex-wrap: wrap;              /* dar panelde sığmayan sekme alt satıra geçer, taşmaz */
-    gap: 0 2px;
-    border-bottom: 1px solid var(--cizgi);
-}
-
-.sekmeler button {
-    padding: 6px 6px;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    background: none;
-    color: var(--soluk-yazi);
-    font: inherit;
-    font-weight: 600;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.sekmeler button.secili {
-    border-bottom-color: var(--vurgu);
-    color: var(--vurgu);
 }
 
 /* Sekmenin içeriği: panelin kalan yüksekliğini doldurur, uzunsa kendi içinde kayar. */
@@ -847,7 +786,7 @@ body {
     color: var(--soluk-yazi);
 }
 
-/* Sonuç kutusu. Varsayılan hali nötr (gri): hiç puan girilmemişse ya da kalem yoksa. */
+/* Sonuç kutusu (GPA kartı). Varsayılan hali nötr (gri). */
 .hesap-sonucu {
     padding: 14px 16px;
     border: 1px solid var(--cerceve);
@@ -856,8 +795,7 @@ body {
     transition: border-color var(--gecis);
 }
 
-.hesap-sonucu:hover,
-.yoklama-karti:hover {
+.hesap-sonucu:hover {
     border-color: var(--cerceve-parlak);
 }
 
@@ -1001,70 +939,6 @@ body {
     color: var(--ton-bilgi-yazi);
     font-size: 11.5px;
     font-weight: 500;
-}
-
-/* Sınav bloğundan gelindiğinde ilgili kalemin satırı kısa süre vurgulanır. */
-.panel-tablosu tr.vurgulu td {
-    animation: satir-vurgusu 1.6s ease-out;
-}
-
-@keyframes satir-vurgusu {
-    from { background: var(--uyari-zemin); }
-    to { background: transparent; }
-}
-
-/* ---------- Notlar ---------- */
-
-.ders-notlari {
-    flex: 1;
-    min-height: 160px;
-    padding: 8px 10px;
-    border: 1px solid var(--cerceve);
-    border-radius: 8px;
-    background: var(--yuzey-2);
-    color: inherit;
-    font: inherit;
-    line-height: 1.4;
-    resize: none;
-}
-
-.ders-notlari:focus {
-    outline: 2px solid var(--vurgu-zemin);
-    border-color: var(--vurgu);
-}
-
-.not-durumu {
-    min-height: 15px;
-    font-size: 11px;
-    color: var(--soluk-yazi);
-}
-
-/* ---------- Bilgi ---------- */
-
-#bilgi-duzenle {
-    align-self: flex-start;
-}
-
-#bilgi-icerigi h3 {
-    margin: 12px 0 4px;
-    font-size: 12px;
-    color: var(--soluk-yazi);
-    font-weight: 600;
-}
-
-#bilgi-icerigi h3:first-child {
-    margin-top: 0;
-}
-
-#bilgi-icerigi ul {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-}
-
-#bilgi-icerigi li {
-    padding: 4px 0;
-    border-top: 1px solid var(--cizgi);
 }
 
 /* ============================================================
@@ -2213,142 +2087,6 @@ body {
     margin-left: 0;
 }
 
-/* ---------- Sağ panel: Devamsızlık sekmesi ---------- */
-
-.yoklama-karti {
-    padding: 14px 16px;
-    border: 1px solid var(--cerceve);
-    border-radius: var(--ic-kose);
-    background: var(--yuzey-2);
-    transition: border-color var(--gecis);
-}
-
-.yoklama-karti h3 {
-    margin: 0 0 4px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--soluk-yazi);
-}
-
-.yoklama-karti p {
-    margin: 6px 0 0;
-}
-
-/* Büyük değer: basınca yüzde ile saat arasında değişir. */
-.katilim-degeri {
-    display: block;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: inherit;
-    font: inherit;
-    font-size: 19px;
-    font-weight: 700;
-    line-height: 1.3;
-    text-align: left;
-    cursor: pointer;
-}
-
-.katilim-degeri small {
-    display: block;
-    font-size: 10.5px;
-    font-weight: 400;
-    color: var(--soluk-yazi);
-}
-
-.katilim-yok {
-    font-size: 17px;
-    font-weight: 700;
-}
-
-/* Sınır bölümü: ilerleme çubuğu ve "Kullanılan X / Y". Rengi duruma göre. */
-.sinir-durumu {
-    margin-top: 10px;
-    padding: 10px 12px;
-    border: 1px solid var(--cerceve);
-    border-radius: 12px;
-}
-
-.sinir-durumu.yesil {
-    border-color: var(--sonuc-yesil-cerceve);
-    background: linear-gradient(180deg, var(--sonuc-yesil-zemin), transparent 60%) var(--yuzey);
-    color: var(--sonuc-yesil-yazi);
-}
-
-.sinir-durumu.sari {
-    border-color: var(--sonuc-sari-cerceve);
-    background: linear-gradient(180deg, var(--sonuc-sari-zemin), transparent 60%) var(--yuzey);
-    color: var(--sonuc-sari-yazi);
-}
-
-.sinir-durumu.kirmizi {
-    border-color: var(--sonuc-kirmizi-cerceve);
-    background: linear-gradient(180deg, var(--sonuc-kirmizi-zemin), transparent 60%) var(--yuzey);
-    color: var(--sonuc-kirmizi-yazi);
-}
-
-.sinir-durumu strong {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.sinir-durumu p {
-    margin: 4px 0 0;
-    font-size: 12px;
-}
-
-.ilerleme {
-    height: 5px;
-    margin-bottom: 7px;
-    border-radius: 3px;
-    background: var(--ilerleme-zemin);
-    overflow: hidden;
-}
-
-.ilerleme span {
-    display: block;
-    height: 100%;
-    border-radius: 3px;
-    background: currentColor;
-}
-
-.gecmis-oturumlar h3 {
-    margin: 4px 0 4px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--soluk-yazi);
-}
-
-.gecmis-satiri {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 5px 0;
-    border-top: 1px solid var(--cizgi);
-}
-
-.gecmis-satiri small {
-    display: block;
-    color: var(--soluk-yazi);
-}
-
-.gecmis-satiri .durum-secici button {
-    width: 26px;
-    padding: 3px 0;
-}
-
-/* 2+ saatlik oturumda "Saat saat" bölümü satırın altına iner. */
-.gecmis-satiri {
-    flex-wrap: wrap;
-}
-
-.gecmis-satiri > div:first-child {
-    flex: 1;
-    min-width: 0;
-}
-
 /* ============================================================
    AKADEMİK TAKVİMDEN DOLDUR
    ============================================================ */
@@ -3319,3 +3057,405 @@ kbd {
     display: none;
 }
 
+/* ============================================================
+   DERS PANELİ (sağ panelde bir ders seçilince)
+   Sekmeler korunur; her sekmenin içi "Dönem ilerlemesi" kartının stilinde tonlu kartlardan oluşur.
+   Ortak bileşenler yeniden kullanılır: tonlu kart, simge karesi, hap rozet, halka, iç satır,
+   "etiket solda değer sağda" satırı. Sekme tonları: Not hesabı mavi, Devamsızlık turkuaz,
+   Notlar amber, Bilgi mor. Durum renkleri (yeşil / sarı / kırmızı) tondan bağımsızdır.
+   ============================================================ */
+
+/* Ek tonlar: amber (Notlar) ve mor (Bilgi) */
+.ton-amber { --ton-rgb: 245, 158, 11; --ton-yazi: var(--ton-amber-yazi); }
+.ton-mor { --ton-rgb: 124, 124, 240; --ton-yazi: var(--ton-bilgi-yazi); }
+
+:root {
+    --ton-amber-yazi: #b45309;    /* amber tonun açık temada okunur yazı rengi */
+}
+
+:root[data-tema="koyu"] {
+    --ton-amber-yazi: #fbbf24;
+}
+
+/* Simge karesi kartın kendi tonunda */
+.simge-karesi.kare-ton {
+    background: rgb(var(--ton-rgb));
+}
+
+.ders-paneli {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 16px 0;
+    /* Panelin genişliğine göre düzen değişir (aşağıdaki @container kuralları). */
+    container: ders-paneli / inline-size;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Başlık: ders rengi karesi, kod ve ad; altında künye rozetleri ---------- */
+
+.panel-baslik {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.panel-baslik .simge-karesi {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+}
+
+.panel-baslik .simge-karesi .simge {
+    width: 20px;
+    height: 20px;
+}
+
+.panel-adlar {
+    flex: 1;
+    min-width: 0;
+}
+
+.panel-adlar h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.panel-adlar p {
+    margin: 2px 0 0;
+    color: var(--soluk-yazi);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.panel-kunye {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* ---------- Sekmeler: segmentli kontrol ---------- */
+
+.sekmeler {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 14px;
+    background: var(--yuzey-2);
+}
+
+.sekmeler button {
+    display: inline-flex;
+    flex: 1 1 0;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 7px 8px;
+    border: 0;
+    border-radius: 10px;
+    background: none;
+    color: var(--soluk-yazi);
+    font: inherit;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background var(--gecis), color var(--gecis);
+}
+
+.sekmeler button .simge {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+}
+
+.sekmeler button:hover {
+    color: var(--baslik-rengi);
+}
+
+/* Aktif sekme: kendi tonunun %15'i zemin, ton renginde yazı ve simge. */
+.sekmeler button.secili {
+    flex: 2.2 1 auto;
+    background: rgba(var(--ton-rgb), 0.15);
+    color: var(--ton-yazi);
+}
+
+.sekmeler button:focus-visible {
+    outline: 2px solid rgb(var(--ton-rgb));
+    outline-offset: 1px;
+}
+
+/* Dar panelde sadece simge görünür; aktif sekmede yazı da görünür (ad ipucunda kalır). */
+.sekmeler button:not(.secili) span {
+    display: none;
+}
+
+@container ders-paneli (min-width: 400px) {
+    .sekmeler button:not(.secili) span {
+        display: inline;
+    }
+
+    .sekmeler button,
+    .sekmeler button.secili {
+        flex: 1 1 auto;
+    }
+}
+
+/* ---------- Sekme içeriği: kart yığını ---------- */
+
+.sekme-icerigi {
+    gap: 14px;
+}
+
+#kalem-listesi:empty {
+    display: none;
+}
+
+/* İç satırın içindeki rozet ve düğmeler satırın zemininden ayrışsın. */
+.ders-paneli .ic-satir .hap,
+.ders-paneli .ic-satir .ekstra-etiketi {
+    background: var(--yuzey);
+}
+
+/* Etiket en fazla iki satır; değer sığmazsa alt satıra geçer ve sağa hizalı kalır. */
+.ders-paneli .ed-satiri {
+    flex-wrap: wrap;
+    gap: 2px 12px;
+}
+
+.ders-paneli .ed-etiket {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+}
+
+.ders-paneli .ed-deger {
+    margin-left: auto;
+}
+
+/* Halkanın durum renkleri (kartın tonundan bağımsız) */
+.halka-olumlu .halka-dolu { stroke: var(--ton-olumlu); }
+.halka-uyari .halka-dolu { stroke: var(--ton-uyari); }
+.halka-tehlike .halka-dolu { stroke: var(--ton-tehlike); }
+
+/* Halkanın ortasındaki tıklanabilir değer (Devamsızlık: yüzde <-> saat) */
+.halka-dugmesi {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.halka-dugmesi small {
+    margin-top: 3px;
+    font-size: 10.5px;
+    font-weight: 400;
+    color: var(--soluk-yazi);
+}
+
+.halka-dugmesi.dar-yazi {
+    font-size: 12px;
+}
+
+.halka-dugmesi:hover {
+    background: rgba(var(--ton-rgb), 0.10);
+}
+
+.halka-dugmesi:focus-visible {
+    outline: 2px solid rgb(var(--ton-rgb));
+    outline-offset: 2px;
+}
+
+/* Mesaj satırı: solda durum işareti, yanında başlık ve soluk ek satırlar */
+.mesaj-satiri {
+    align-items: flex-start;
+}
+
+.mesaj-satiri .ic-satir-yazisi {
+    align-self: center;
+    gap: 2px;
+}
+
+/* Kart başlığındaki ve mesaj satırındaki küçük düğme (Düzenle) */
+.dugme.kucuk {
+    flex-shrink: 0;
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-size: 12px;
+}
+
+.ic-satir .dugme.kucuk {
+    background: var(--yuzey);
+}
+
+/* ---------- Not hesabı: Kalemler kartı ---------- */
+
+.kalem-satiri {
+    padding: 8px 10px 8px 12px;
+}
+
+.kalem-satiri .kalem-agirligi {
+    margin-left: 0;
+}
+
+.kalem-puani {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+}
+
+.kalem-puani input {
+    width: 62px;
+    padding: 5px 7px;
+    border: 1px solid var(--cerceve);
+    border-radius: 9px;
+    background: var(--yuzey);
+    color: inherit;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.kalem-puani input:focus {
+    outline: 2px solid rgba(var(--ton-rgb), 0.30);
+    border-color: rgb(var(--ton-rgb));
+}
+
+.kalem-puani input.eksik {
+    border-color: var(--hata);
+}
+
+/* Sınav bloğundan gelindiğinde ilgili kalemin satırı kısa süre vurgulanır. */
+.kalem-satiri.vurgulu {
+    animation: kalem-vurgusu 1.6s ease-out;
+}
+
+@keyframes kalem-vurgusu {
+    from { box-shadow: 0 0 0 2px var(--ton-uyari); }
+    to { box-shadow: 0 0 0 2px transparent; }
+}
+
+/* ---------- Devamsızlık: Geçmiş oturumlar kartı ---------- */
+
+/* 2+ saatlik oturumda "Saat saat" bölümü satırın altına iner. */
+.gecmis-satiri {
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    padding: 8px 10px 8px 12px;
+}
+
+/* Tarih ve saat bölünmez; yer kalmazsa (dar panel) seçici alt satıra iner ve sağa yaslanır. */
+.gecmis-satiri .ic-satir-yazisi {
+    flex: 1 1 120px;
+}
+
+.gecmis-satiri .ic-satir-yazisi strong {
+    white-space: nowrap;
+}
+
+.gecmis-satiri .durum-secici {
+    margin-left: auto;
+}
+
+.gecmis-satiri .durum-secici button {
+    width: 26px;
+    padding: 3px 0;
+    background: var(--yuzey);
+}
+
+.gecmis-satiri .durum-secici button.secili {
+    background: var(--dolgu);
+}
+
+.gecmis-satiri .hap {
+    align-self: flex-start;
+    margin: 3px 0 0;
+}
+
+.gecmis-oturumlar .satir-ekle {
+    align-self: flex-start;
+    padding: 2px 4px;
+}
+
+/* ---------- Notlar ---------- */
+
+/* Kart sekmenin kalan yüksekliğini doldurur; metin alanı kartla birlikte uzar. */
+.not-karti {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 250px;
+}
+
+.not-karti .ozet-govdesi {
+    flex: 1;
+}
+
+.ders-notlari {
+    flex: 1;
+    min-height: 150px;
+    padding: 12px 14px;
+    border: 1px solid transparent;
+    border-radius: 16px;
+    background: var(--yuzey-2);
+    color: inherit;
+    font: inherit;
+    line-height: 1.5;
+    resize: none;
+}
+
+/* Odakta ton renginde ince halka */
+.ders-notlari:focus {
+    outline: 0;
+    border-color: rgb(var(--ton-rgb));
+    box-shadow: 0 0 0 3px rgba(var(--ton-rgb), 0.18);
+}
+
+.kucuk-not.hata-yazisi {
+    color: var(--hata);
+}
+
+/* Küçük durum yazısı (Ayarlar ve Dönem pencerelerindeki "Kaydedildi" göstergeleri) */
+.not-durumu {
+    min-height: 15px;
+    font-size: 11px;
+    color: var(--soluk-yazi);
+}
+
+/* ---------- Bilgi: Değerlendirme kartındaki "ekstra" rozeti ve ağırlık ---------- */
+
+.kalem-ozeti {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ---------- Dar panel (340px altı): halka üstte, satırlar altında ---------- */
+/* (Panelin kenar boşlukları düşülünce içerik genişliği 306px'in altında kalır.) */
+@container ders-paneli (max-width: 305px) {
+    .ders-paneli .halka-duzeni {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .ders-paneli .ilerleme-halkasi {
+        align-self: center;
+    }
+}

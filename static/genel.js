@@ -16,6 +16,13 @@ let genelBakisKaydirmasi = 0;                          // ders paneline geçerke
 const OZET_SIMGELERI = {
     kalem: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
     halka: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5"/>',
+    // Ders panelinin kartları (static/uygulama.js, static/yoklama.js)
+    hesap: '<path d="M4 5v14h16"/><path d="M8 15v-4"/><path d="M12 15V8"/><path d="M16 15v-6"/>',
+    liste: '<path d="M9 6h11"/><path d="M9 12h11"/><path d="M9 18h11"/><path d="M4.5 6h.01"/><path d="M4.5 12h.01"/><path d="M4.5 18h.01"/>',
+    katilim: '<circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="m16 11 2 2 4-4"/>',
+    gecmis: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    bilgi: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/>',
+    takvim: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16"/><path d="M8 3v4"/><path d="M16 3v4"/>',
 };
 
 function ozetSimgesi(ad) {

@@ -521,66 +521,94 @@ function donemBaglantisi(yazi) {
     return baglanti;
 }
 
-// Bir havuzun (Teori / Lab / Toplam) kartı.
+// Bir havuzun (Teori / Lab / Toplam) kartı: "Dönem ilerlemesi" kartının düzeninde.
+//   Başlık : havuz adı, sağda durum rozeti (✓ Güvende / ! Dikkat / ✗ Hak bitti / ✗ Sınır aşıldı)
+//   Halka  : kullanılan devamsızlık / sınır (sınır girilmemişse katılım yüzdesi). Ortasındaki değere
+//            basınca "katılım %83" ile "10s / 2s" (gidilen / gidilmeyen saat) arasında değişir.
+//   Satırlar: Gidilen, Gidilmeyen, Kalan hak, Kalan ders, Sınır
+// Hesap ve renk eşikleri dersYoklamasi'ndan gelir; burada sadece gösterilir.
 function havuzKarti(havuz) {
     const birim = birimAdi();
     const sayi = (deger) => ikiOndalik(deger);
-    const kart = eleman("div", "yoklama-karti");
-    kart.appendChild(eleman("h3", "", havuz.ad));
+    const sinirVar = havuz.limit !== null;
 
-    // Büyük değer: "Katılım %83" <-> "Gidilen 10 saat · Gidilmeyen 2 saat"
-    if (havuz.katilimYuzdesi === null) {
-        kart.appendChild(eleman("div", "katilim-yok", "Henüz veri yok"));
+    let rozet = null;
+    if (havuz.renk === "yesil") rozet = durumRozeti("olumlu", "✓", "Güvende");
+    else if (havuz.renk === "sari") rozet = durumRozeti("uyari", "!", "Dikkat");
+    else if (havuz.renk === "kirmizi") rozet = durumRozeti("tehlike", "✗", havuz.kalanHak < 0 ? "Sınır aşıldı" : "Hak bitti");
+    const { kart, govde } = ozetKarti({ baslik: havuz.ad, simge: "katilim", kare: "ton", ton: "turkuaz", rozet });
+
+    // Halkanın doluluğu ve rengi.
+    let doluluk;
+    let etiket;
+    if (sinirVar) {
+        doluluk = havuz.limit > 0 ? Math.min(1, havuz.gidilmeyen / havuz.limit) : 1;
+        etiket = `Kullanılan ${sayi(havuz.gidilmeyen)} / ${sayi(havuz.limit)} ${birim}`;
     } else {
-        const saatGorunumu = saatGorunumuMu();
-        const deger = eleman("button", "katilim-degeri", saatGorunumu
-            ? `Gidilen ${sayi(havuz.gidilen)} ${birim} · Gidilmeyen ${sayi(havuz.gidilmeyen)} ${birim}`
-            : `Katılım %${Math.round(havuz.katilimYuzdesi * 10) / 10}`);
-        deger.type = "button";
-        deger.setAttribute("aria-pressed", String(saatGorunumu));
-        deger.appendChild(eleman("small", "", saatGorunumu ? "Yüzde için dokun" : "Saat için dokun"));
-        deger.addEventListener("click", gorunumuDegistir);
-        kart.appendChild(deger);
+        doluluk = havuz.katilimYuzdesi === null ? 0 : havuz.katilimYuzdesi / 100;
+        etiket = havuz.katilimYuzdesi === null ? "Henüz veri yok" : `Katılım yüzde ${Math.round(havuz.katilimYuzdesi * 10) / 10}`;
+    }
+    const halkaRengi = { yesil: "olumlu", sari: "uyari", kirmizi: "tehlike" }[havuz.renk] || "";
+    const saatGorunumu = saatGorunumuMu();
+    const veriVar = havuz.katilimYuzdesi !== null;
+    const halka = panelHalkasi({
+        doluluk, etiket, renk: halkaRengi,
+        buyuk: !veriVar ? "—" : saatGorunumu
+            ? `${sayi(havuz.gidilen)}s / ${sayi(havuz.gidilmeyen)}s`
+            : `%${Math.round(havuz.katilimYuzdesi * 10) / 10}`,
+        kucuk: !veriVar ? "veri yok" : saatGorunumu ? "saat" : "katılım",
+    });
+    halka.title = etiket;
+    if (veriVar) {
+        // Ortadaki yazı bir düğmedir: yüzde <-> saat (tercih tarayıcıda saklanır).
+        const orta = halka.querySelector("strong");
+        const dugme = eleman("button", `halka-dugmesi ${orta.className}${saatGorunumu ? " dar-yazi" : ""}`);
+        dugme.type = "button";
+        dugme.append(...orta.childNodes);
+        dugme.title = saatGorunumu ? "Yüzde için dokun" : "Saat için dokun";
+        dugme.setAttribute("aria-pressed", String(saatGorunumu));
+        dugme.setAttribute("aria-label", saatGorunumu
+            ? `Gidilen ${sayi(havuz.gidilen)} ${birim}, gidilmeyen ${sayi(havuz.gidilmeyen)} ${birim}. Yüzde için dokun`
+            : `Katılım yüzde ${Math.round(havuz.katilimYuzdesi * 10) / 10}. Saat için dokun`);
+        dugme.addEventListener("click", gorunumuDegistir);
+        orta.replaceWith(dugme);
     }
 
-    const sayaclar = `Dönem toplamı: ${sayi(havuz.toplam)} ${birim} (iptal ve tatiller hariç)`
-        + ` · Geçen: ${sayi(havuz.gecen)} · Kalan ders: ${sayi(havuz.kalanDers)}`;
-    if (havuz.limit === null) {
-        kart.appendChild(eleman("p", "kucuk-not", "Devamsızlık hakkı girilmemiş."));
-        kart.appendChild(eleman("p", "kucuk-not", sayaclar));
-    } else {
-        // Sınır bölümü: renk ve simge birlikte (anlam sadece renge bağlı değil).
-        const sinir = eleman("div", `sinir-durumu ${havuz.renk}`);
-        const cubuk = eleman("div", "ilerleme");
-        const dolu = eleman("span");
-        dolu.style.width = `${havuz.limit > 0 ? Math.min(100, havuz.gidilmeyen / havuz.limit * 100) : 100}%`;
-        cubuk.appendChild(dolu);
-        const simge = { yesil: "✓", sari: "!", kirmizi: "✗" }[havuz.renk];
-        sinir.append(cubuk, eleman("strong", "", `${simge} Kullanılan ${sayi(havuz.gidilmeyen)} / ${sayi(havuz.limit)} ${birim}`));
-        if (havuz.kalanHak < 0) sinir.appendChild(eleman("p", "", "Devamsızlık sınırı aşıldı."));
-        else if (havuz.kalanHak === 0) sinir.appendChild(eleman("p", "", "Hakkın bitti, bir sonraki devamsızlıkta sınırı aşarsın."));
-        else if (havuz.renk === "sari") sinir.appendChild(eleman("p", "", "Devamsızlık sınırına yaklaştın."));
-        kart.appendChild(sinir);
-        kart.appendChild(eleman("p", "kucuk-not", `Kalan hak: ${sayi(havuz.kalanHak)} ${birim} · ${sayaclar}`));
-        kart.appendChild(eleman("p", "kucuk-not", `Sınır: %${havuz.yuzde}, en fazla ${sayi(havuz.limit)} ${birim}`));
-    }
+    govde.appendChild(halkaDuzeni(halka, [
+        ["Gidilen", `${sayi(havuz.gidilen)} ${birim}`],
+        ["Gidilmeyen", `${sayi(havuz.gidilmeyen)} ${birim}`],
+        ["Kalan hak", sinirVar ? `${sayi(havuz.kalanHak)} ${birim}` : "—",
+            havuz.renk === "kirmizi" ? "tehlike" : havuz.renk === "sari" ? "uyari" : ""],
+        ["Kalan ders", `${sayi(havuz.kalanDers)} ${birim}`],
+        ["Sınır", sinirVar ? `%${havuz.yuzde} · ${sayi(havuz.limit)} ${birim}` : "Girilmemiş"],
+    ]));
 
-    const digerleri = [];
-    if (havuz.alinmadi > 0) digerleri.push(`Yoklama alınmadı: ${sayi(havuz.alinmadi)} ${birim}`);
-    if (havuz.iptal > 0) digerleri.push(`İptal: ${sayi(havuz.iptal)} ${birim}`);
-    if (digerleri.length > 0) kart.appendChild(eleman("p", "kucuk-not", digerleri.join(" · ")));
+    // Küçük soluk satır: dönem toplamı ve (varsa) alınmayan / iptal saatler.
+    const digerleri = [`Dönem toplamı ${sayi(havuz.toplam)} ${birim} (iptal ve tatiller hariç)`, `Geçen ${sayi(havuz.gecen)}`];
+    if (havuz.alinmadi > 0) digerleri.push(`Yoklama alınmadı ${sayi(havuz.alinmadi)}`);
+    if (havuz.iptal > 0) digerleri.push(`İptal ${sayi(havuz.iptal)}`);
+    govde.appendChild(eleman("p", "kucuk-not", digerleri.join(" · ")));
+
+    // Uyarı ve aşım mesajları (iç satır).
+    if (!sinirVar) govde.appendChild(mesajSatiri({ ton: "bilgi", simge: "i", baslik: "Devamsızlık hakkı girilmemiş." }));
+    else if (havuz.kalanHak < 0) govde.appendChild(mesajSatiri({ ton: "tehlike", simge: "✗", baslik: "Devamsızlık sınırı aşıldı." }));
+    else if (havuz.kalanHak === 0) govde.appendChild(mesajSatiri({ ton: "tehlike", simge: "✗", baslik: "Hakkın bitti, bir sonraki devamsızlıkta sınırı aşarsın." }));
+    else if (havuz.renk === "sari") govde.appendChild(mesajSatiri({ ton: "uyari", simge: "!", baslik: "Devamsızlık sınırına yaklaştın." }));
     return kart;
 }
 
-// Sekmenin tamamını çizer: (varsa) dönem notu, havuz kartları ve geçmiş oturumlar listesi.
+// Sekmenin tamamını çizer: (varsa) dönem notu, havuz kartları ve "Geçmiş oturumlar" kartı.
 function devamsizligiCiz(ders) {
     const kaydirma = devamsizlikIcerigi.scrollTop;
     devamsizlikIcerigi.replaceChildren();
     const donem = yoklamaVerisi.donem;
     if (!donem) {
-        const not = eleman("p", "mesaj uyari", "Yoklama takibi için dönem tarihlerini gir. ");
-        not.appendChild(donemBaglantisi("Akademik takvimi aç"));
-        devamsizlikIcerigi.appendChild(not);
+        // Dönem girilmemiş: aynı kart stilinde boş durum.
+        const { kart, govde } = ozetKarti({ baslik: "Devamsızlık", simge: "katilim", kare: "ton", ton: "turkuaz" });
+        const satir = mesajSatiri({ ton: "uyari", simge: "!", baslik: "Yoklama takibi için dönem tarihlerini gir." });
+        satir.querySelector(".ic-satir-yazisi").appendChild(donemBaglantisi("Akademik takvimi aç"));
+        govde.appendChild(satir);
+        devamsizlikIcerigi.appendChild(kart);
         return;
     }
     if (yoklamaVerisi.simdi.slice(0, 10) < donem.baslangic) {
@@ -598,21 +626,25 @@ function devamsizligiCiz(ders) {
     }
     gecmis.sort((a, b) => b.tarih.localeCompare(a.tarih) || b.oturum.baslangic.localeCompare(a.oturum.baslangic));
     if (gecmis.length > 0) {
-        const bolum = eleman("section", "gecmis-oturumlar");
-        bolum.appendChild(eleman("h3", "", "Geçmiş oturumlar"));
+        const { kart, govde } = ozetKarti({
+            baslik: "Geçmiş oturumlar", simge: "gecmis", kare: "ton", ton: "turkuaz",
+            rozet: hapRozet(`${gecmis.length} oturum`),
+        });
+        kart.classList.add("gecmis-oturumlar");
         const hataYeri = eleman("p", "mesaj hata");
         hataYeri.hidden = true;
         for (const { oturum, tarih } of gecmis.slice(0, gecmisSatirSayisi)) {
-            const satir = eleman("div", "gecmis-satiri");
-            const bilgi = eleman("div", "", tarihiGoster(tarih));
-            bilgi.appendChild(eleman("small", "", [`${oturum.baslangic}-${oturum.bitis}`, oturum.tur].filter(Boolean).join(" · ")));
+            const satir = eleman("div", "ic-satir gecmis-satiri");
+            const bilgi = eleman("div", "ic-satir-yazisi");
+            bilgi.appendChild(eleman("strong", "", tarihiGoster(tarih)));
+            bilgi.appendChild(eleman("small", "", [`${oturum.baslangic} – ${oturum.bitis}`, oturum.tur].filter(Boolean).join(" · ")));
             const parcalar = yoklamaParcalari(oturum, tarih, false, hataYeri);
             if (parcalar.rozet) bilgi.append(parcalar.rozet, parcalar.ozet);
             satir.append(bilgi, parcalar.secici);
             if (parcalar.ok) satir.append(parcalar.ok, parcalar.bolum);
-            bolum.appendChild(satir);
+            govde.appendChild(satir);
         }
-        bolum.appendChild(hataYeri);
+        govde.appendChild(hataYeri);
         if (gecmis.length > gecmisSatirSayisi) {
             const dahaFazla = eleman("button", "satir-ekle", "Daha fazla göster");
             dahaFazla.type = "button";
@@ -620,9 +652,9 @@ function devamsizligiCiz(ders) {
                 gecmisSatirSayisi += 15;
                 devamsizligiCiz(ders);
             });
-            bolum.appendChild(dahaFazla);
+            govde.appendChild(dahaFazla);
         }
-        devamsizlikIcerigi.appendChild(bolum);
+        devamsizlikIcerigi.appendChild(kart);
     }
     devamsizlikIcerigi.scrollTop = kaydirma;
 }

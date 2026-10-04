@@ -193,47 +193,55 @@
             <!-- Görünüm: seçili dersin paneli (içeriğini JavaScript doldurur) -->
             <section class="panel-gorunumu ders-paneli" data-gorunum="ders" hidden>
                 <button type="button" class="geri-dugmesi" id="panel-geri"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m11 6-6 6 6 6"/></svg>Genel bakış</button>
+                <!-- Başlık: ders rengi dolgulu simge karesi, ders kodu ve (varsa) adı -->
                 <header class="panel-baslik">
-                    <span class="renk-noktasi" id="panel-renk"></span>
+                    <span class="simge-karesi" id="panel-renk"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg></span>
                     <div class="panel-adlar">
                         <h2 id="panel-kod"></h2>
                         <p id="panel-ad"></p>
                     </div>
                     <button type="button" class="kapat" id="panel-kapat" title="Genel bakışa dön" aria-label="Genel bakışa dön">×</button>
                 </header>
-                <!-- Kredi, hedef harf notu, devamsızlık hakkı -->
-                <p class="panel-kunye" id="panel-kunye"></p>
+                <!-- Künye: küçük hap rozetler (kredi, hedef harf notu, devamsızlık hakkı) -->
+                <div class="panel-kunye" id="panel-kunye"></div>
 
-                <nav class="sekmeler" id="sekmeler">
-                    <button type="button" data-sekme="hesap">Not hesabı</button>
-                    <button type="button" data-sekme="devamsizlik">Devamsızlık</button>
-                    <button type="button" data-sekme="notlar">Notlar</button>
-                    <button type="button" data-sekme="bilgi">Bilgi</button>
-                </nav>
+                <!-- Sekmeler: segmentli kontrol. Her sekmenin kendi tonu var (ton-...); sol/sağ ok
+                     tuşlarıyla gezilir (static/uygulama.js). Dar panelde sadece aktif sekmenin yazısı görünür. -->
+                <div class="sekmeler" id="sekmeler" role="tablist" aria-label="Ders paneli">
+                    <button type="button" role="tab" class="ton-mavi" data-sekme="hesap" id="sekme-hesap" aria-controls="icerik-hesap" title="Not hesabı"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v14h16"/><path d="M8 15v-4"/><path d="M12 15V8"/><path d="M16 15v-6"/></svg><span>Not hesabı</span></button>
+                    <button type="button" role="tab" class="ton-turkuaz" data-sekme="devamsizlik" id="sekme-devamsizlik" aria-controls="devamsizlik-icerigi" title="Devamsızlık"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="m16 11 2 2 4-4"/></svg><span>Devamsızlık</span></button>
+                    <button type="button" role="tab" class="ton-amber" data-sekme="notlar" id="sekme-notlar" aria-controls="icerik-notlar" title="Notlar"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M9 8h3"/><path d="M9 12h7"/><path d="M9 16h7"/></svg><span>Notlar</span></button>
+                    <button type="button" role="tab" class="ton-mor" data-sekme="bilgi" id="sekme-bilgi" aria-controls="bilgi-icerigi" title="Bilgi"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg><span>Bilgi</span></button>
+                </div>
 
-                <!-- Sekme: Not hesabı -->
-                <div class="sekme-icerigi" data-sekme="hesap">
-                    <!-- Sonuç kutusu ve (varsa) küçük not -->
+                <!-- Sekme: Not hesabı. "Sonuç" ve "Kalemler" kartlarını static/uygulama.js çizer. -->
+                <div class="sekme-icerigi" role="tabpanel" data-sekme="hesap" id="icerik-hesap" aria-labelledby="sekme-hesap">
                     <div id="hesap-ozeti"></div>
                     <!-- Kalem listesi: her satırda kalem ve aldığım puan -->
-                    <table class="panel-tablosu" id="kalem-tablosu"></table>
+                    <div id="kalem-listesi"></div>
                     <p class="mesaj hata" id="puan-hatasi" hidden></p>
                 </div>
 
                 <!-- Sekme: Devamsızlık (içeriğini static/yoklama.js çizer) -->
-                <div class="sekme-icerigi" data-sekme="devamsizlik" id="devamsizlik-icerigi" hidden></div>
+                <div class="sekme-icerigi" role="tabpanel" data-sekme="devamsizlik" id="devamsizlik-icerigi" aria-labelledby="sekme-devamsizlik" hidden></div>
 
-                <!-- Sekme: Notlar (yazarken otomatik kaydedilir) -->
-                <div class="sekme-icerigi" data-sekme="notlar" hidden>
-                    <textarea class="ders-notlari" id="ders-notlari" placeholder="Bu dersle ilgili notların..." aria-label="Ders notları"></textarea>
-                    <span class="not-durumu" id="not-durumu"></span>
+                <!-- Sekme: Notlar (yazarken otomatik kaydedilir; rozet kayıt durumunu gösterir) -->
+                <div class="sekme-icerigi" role="tabpanel" data-sekme="notlar" id="icerik-notlar" aria-labelledby="sekme-notlar" hidden>
+                    <section class="ozet-karti tonlu ton-amber not-karti">
+                        <header class="ozet-basligi">
+                            <span class="simge-karesi kare-ton"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M9 8h3"/><path d="M9 12h7"/><path d="M9 16h7"/></svg></span>
+                            <h3>Ders notları</h3>
+                            <span class="hap olumlu" id="not-durumu" role="status"></span>
+                        </header>
+                        <div class="ozet-govdesi">
+                            <textarea class="ders-notlari" id="ders-notlari" placeholder="Bu dersle ilgili notların..." aria-label="Ders notları"></textarea>
+                            <p class="kucuk-not" id="not-zamani" hidden></p>
+                        </div>
+                    </section>
                 </div>
 
-                <!-- Sekme: Bilgi (salt okunur özet) -->
-                <div class="sekme-icerigi" data-sekme="bilgi" hidden>
-                    <button type="button" class="dugme" id="bilgi-duzenle">Düzenle</button>
-                    <div id="bilgi-icerigi"></div>
-                </div>
+                <!-- Sekme: Bilgi (salt okunur özet; kartlarını static/uygulama.js çizer) -->
+                <div class="sekme-icerigi" role="tabpanel" data-sekme="bilgi" id="bilgi-icerigi" aria-labelledby="sekme-bilgi" hidden></div>
             </section>
 
         </aside>

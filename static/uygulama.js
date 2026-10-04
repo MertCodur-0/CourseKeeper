@@ -995,15 +995,17 @@ izgara.addEventListener("click", (olay) => {
 const yanPanel = document.getElementById("yan-panel");
 const sekmeler = document.getElementById("sekmeler");
 const hesapOzeti = document.getElementById("hesap-ozeti");
-const kalemTablosu = document.getElementById("kalem-tablosu");
+const kalemListesi = document.getElementById("kalem-listesi");
 const puanHatasi = document.getElementById("puan-hatasi");
 const notAlani = document.getElementById("ders-notlari");
 const notDurumu = document.getElementById("not-durumu");
+const notZamani = document.getElementById("not-zamani");
 const bilgiIcerigi = document.getElementById("bilgi-icerigi");
 
 let seciliDersId = null;       // panelde açık olan dersin kimliği (yoksa null)
 let seciliSekme = "hesap";     // "hesap", "devamsizlik", "notlar" veya "bilgi"
 let notZamanlayici = null;     // yazılan notun bekleyen otomatik kaydı
+let notZamanlari = new Map();  // ders kimliği -> notun bu oturumdaki son kayıt zamanı ("14.10.2026 16:05")
 
 // Küçük yardımcı: bir HTML elemanı oluşturur.
 function eleman(etiket, sinif, yazi) {
@@ -1072,14 +1074,75 @@ function paneliYenile() {
     dersPaneliniCiz(false);
 }
 
+// Sekmeyi gösterir. Sekme düğmeleri bir "tablist"tir: seçili olan aria-selected ile işaretlenir ve
+// Tab tuşuyla sadece ona gelinir; diğerlerine sol/sağ ok tuşlarıyla geçilir.
 function sekmeyiGoster(ad) {
     seciliSekme = ad;
     sekmeler.querySelectorAll("button").forEach((dugme) => {
-        dugme.classList.toggle("secili", dugme.dataset.sekme === ad);
+        const secili = dugme.dataset.sekme === ad;
+        dugme.classList.toggle("secili", secili);
+        dugme.setAttribute("aria-selected", String(secili));
+        dugme.tabIndex = secili ? 0 : -1;
     });
     yanPanel.querySelectorAll(".sekme-icerigi").forEach((icerik) => {
         icerik.hidden = icerik.dataset.sekme !== ad;
     });
+}
+
+// ---------- Panelin ortak parçaları ----------
+// Kartlar "Genel bakış"taki bileşenlerle kurulur (static/genel.js: ozetKarti, icSatir, etiketDeger,
+// hapRozet). Buradakiler onların üstüne eklenen küçük yardımcılardır.
+
+// İlerleme halkası ("Dönem ilerlemesi" kartındaki bileşen). doluluk: 0-1; ortada büyük yazı ve
+// (varsa) altında küçük yazı. renk: "" (kartın tonu), "olumlu", "uyari" ya da "tehlike".
+function panelHalkasi({ doluluk, buyuk, kucuk, etiket, renk = "" }) {
+    const cevre = 2 * Math.PI * 26;
+    const halka = eleman("div", `ilerleme-halkasi tonlu-halka ${renk ? `halka-${renk}` : ""}`.trim());
+    halka.innerHTML = `<svg viewBox="0 0 64 64" role="img">
+        <circle class="halka-zemin" cx="32" cy="32" r="26"/>
+        <circle class="halka-dolu" cx="32" cy="32" r="26" stroke-dasharray="${cevre}" stroke-dashoffset="${cevre * (1 - doluluk)}"/>
+    </svg>`;
+    halka.firstElementChild.setAttribute("aria-label", etiket);
+    const orta = eleman("strong", kucuk ? "iki-satir" : "");
+    orta.appendChild(eleman("span", "", buyuk));
+    if (kucuk) orta.appendChild(eleman("small", "", kucuk));
+    halka.appendChild(orta);
+    return halka;
+}
+
+// Solda halka, sağda "etiket solda değer sağda" satırları: [[etiket, değer, ton], ...]
+function halkaDuzeni(halka, satirlar) {
+    const liste = eleman("div", "halka-satirlari");
+    for (const [etiket, deger, ton] of satirlar) liste.appendChild(etiketDeger({ etiket, deger, ton }));
+    const duzen = eleman("div", "halka-duzeni");
+    duzen.append(halka, liste);
+    return duzen;
+}
+
+// Durum rozeti: anlam sadece renge bağlı kalmasın diye başında simge de vardır ("✓ Hedefte").
+function durumRozeti(ton, simge, yazi) {
+    const rozet = hapRozet("", ton);
+    const isaret = eleman("span", "", simge);
+    isaret.setAttribute("aria-hidden", "true");
+    rozet.append(isaret, ` ${yazi}`);
+    return rozet;
+}
+
+// Mesaj satırı (iç satır): solda durum işareti, ortada başlık ve altında soluk ek satırlar.
+function mesajSatiri({ ton, simge, baslik, ek = [], sag }) {
+    const satir = icSatir({ sol: eleman("span", `madde-isareti ${ton}`, simge), baslik, sag });
+    satir.classList.add("mesaj-satiri");
+    satir.firstElementChild.setAttribute("aria-hidden", "true");
+    for (const yazi of ek) satir.querySelector(".ic-satir-yazisi").appendChild(eleman("small", "", yazi));
+    return satir;
+}
+
+// Kart başlığındaki küçük "Düzenle" düğmesi: dersin düzenleme formunu açar.
+function duzenleDugmesi(ders) {
+    const dugme = eleman("button", "dugme kucuk", "Düzenle");
+    dugme.type = "button";
+    dugme.addEventListener("click", () => dersFormunuAc(ders));
+    return dugme;
 }
 
 // Seçili dersin panelini baştan çizer.
@@ -1090,22 +1153,26 @@ function dersPaneliniCiz(notlariYukle) {
     genelBakisKonumunuSakla();   // geri dönünce "Genel bakış" kaldığı yerden devam etsin
     panelGorunumunuGoster("ders");
 
-    document.getElementById("panel-renk").style.background = renkBul(ders.renk).kod;
+    const renk = renkBul(ders.renk);
+    document.getElementById("panel-renk").style.background = renk.kod;
+    document.getElementById("panel-renk").style.color = renk.yazi;
     document.getElementById("panel-kod").textContent = ders.kod;
     const adYazisi = document.getElementById("panel-ad");
     adYazisi.textContent = ders.ad || "";
     adYazisi.hidden = !ders.ad;
 
+    // Künye: küçük hap rozetler.
     const kunye = [`Kredi ${ders.kredi}`, `Hedef ${hedefHarf(ders) ? ders.hedef_not : "—"}`];
-    if (ders.devamsizlik_hakki != null) kunye.push(`Devamsızlık hakkı %${ders.devamsizlik_hakki}`);
-    document.getElementById("panel-kunye").textContent = kunye.join(" · ");
+    if (ders.devamsizlik_hakki != null) kunye.push(`Devamsızlık %${ders.devamsizlik_hakki}`);
+    document.getElementById("panel-kunye").replaceChildren(...kunye.map((yazi) => hapRozet(yazi, "soluk")));
 
     if (notlariYukle) {
         notAlani.value = ders.notlar || "";
-        notDurumu.textContent = "";
+        notRozetiniYaz("Kaydedildi", "olumlu");
+        notZamaniniGoster(ders.id);
     }
     sekmeyiGoster(seciliSekme);
-    kalemTablosunuCiz(ders);
+    kalemListesiniCiz(ders);
     hesabiCiz(ders);
     devamsizligiCiz(ders);
     bilgiyiCiz(ders);
@@ -1265,23 +1332,25 @@ function puaniCoz(yazi) {
     return Number(yazi.replace(",", "."));
 }
 
-// Kalem listesi: her satırda solda kalem (türü, küçük gri ağırlığı, varsa "ekstra" etiketi),
-// sağda puan alanı ve yanında girilebilecek en büyük değer ("/ 100" ya da "/ 10").
-function kalemTablosunuCiz(ders) {
-    kalemTablosu.replaceChildren();
+// "Kalemler" kartı: her kalem bir iç satır. Solda kalemin türü (varsa "ekstra" etiketi) ve altında soluk
+// ağırlığı; sağda puan alanı ve yanında girilebilecek en büyük değer ("/ 100" ya da "/ 10").
+function kalemListesiniCiz(ders) {
+    kalemListesi.replaceChildren();
     mesajGoster(puanHatasi, "");
-    kalemTablosu.hidden = ders.degerlendirmeler.length === 0;
-    if (kalemTablosu.hidden) return;
+    if (ders.degerlendirmeler.length === 0) return;
 
-    const govde = kalemTablosu.createTBody();
+    const { kart, govde } = ozetKarti({
+        baslik: "Kalemler", simge: "liste", kare: "ton", ton: "mavi",
+        rozet: hapRozet(`${ders.degerlendirmeler.length} kalem`),
+    });
     for (const kalem of ders.degerlendirmeler) {
-        const satir = govde.insertRow();
+        const satir = eleman("div", "ic-satir kalem-satiri");
         satir.dataset.kalemId = kalem.id;
 
-        const adHucresi = satir.insertCell();
-        adHucresi.textContent = turBul(kalem.tur).ad;
-        adHucresi.appendChild(eleman("span", "kalem-agirligi", `%${kalem.agirlik}`));
-        if (kalem.ekstra_puan) adHucresi.appendChild(eleman("span", "ekstra-etiketi", "ekstra"));
+        const yazi = eleman("div", "ic-satir-yazisi");
+        const ad = eleman("strong", "", turBul(kalem.tur).ad);
+        if (kalem.ekstra_puan) ad.appendChild(eleman("span", "ekstra-etiketi", "ekstra"));
+        yazi.append(ad, eleman("small", "kalem-agirligi", `%${kalem.agirlik}`));
 
         const sinir = puanSiniri(kalem);
         const girdi = eleman("input");
@@ -1296,10 +1365,21 @@ function kalemTablosunuCiz(ders) {
         // "change": değer değiştiyse alandan çıkınca (ya da Enter'a basınca) çalışır.
         girdi.addEventListener("change", () => puaniKaydet(kalem.id, girdi));
 
-        const puanHucresi = satir.insertCell();
-        puanHucresi.className = "sayi";
-        puanHucresi.append(girdi, eleman("span", "puan-siniri", `/ ${sinir}`));
+        const puan = eleman("div", "kalem-puani");
+        puan.append(girdi, eleman("span", "puan-siniri", `/ ${sinir}`));
+        satir.append(yazi, puan);
+        govde.appendChild(satir);
     }
+
+    // Normal kalemlerin toplamı %100'den azsa sarı not (toplam, puan girişiyle değişmez).
+    const normalToplam = notDurumunuHesapla(ders).normalToplam;
+    if (normalToplam < 100) {
+        govde.appendChild(mesajSatiri({
+            ton: "uyari", simge: "!",
+            baslik: `Değerlendirme toplamı %${asagiYuvarla(normalToplam)}, eksik kalem olabilir.`,
+        }));
+    }
+    kalemListesi.appendChild(kart);
 }
 
 // Girilen puanı kontrol edip kaydeder (boş = henüz alınmadı), ardından hesabı yeniler.
@@ -1330,65 +1410,67 @@ async function puaniKaydet(kalemId, girdi) {
     if (seciliDers()) hesabiCiz(seciliDers());
 }
 
-// Not hesabının sonucunu çizer: tek bir sonuç kutusu ve (gerekirse) altında küçük bir not.
-// Kutu: ana yazı "<toplam> puan · <harf>"; hedefe ulaşıldıysa yeşil, ulaşılmadıysa sarı ve
-// altında küçük not; hiç puan girilmediyse nötr gri. Renkler stil.css'te (--sonuc-...).
+// "Sonuç" kartını çizer. Solda halka: kazanılan puanın hedef harfin eşiğine oranı (en fazla %100).
+// Sağda satırlar: Toplam, Seviye (harf), Hedef (harf ve eşiği), Kalan (puanı girilmemiş normal
+// kalemlerin ağırlık toplamı). Altında, hedefe ulaşılmadıysa ne gerektiğini söyleyen mesaj.
+// Durum: puan girilmişse ve hedef belliyse yeşil "✓ Hedefte" ya da sarı "! Hedefin altında".
 function hesabiCiz(ders) {
     const durum = notDurumunuHesapla(ders);
     hesapOzeti.replaceChildren();
 
     const not = sonucMesaji(ders, durum);   // null: hedefe ulaşıldı
-    const kutu = eleman("div", "hesap-sonucu");
+    const hedef = hedefHarf(ders);
+    const kalemVar = ders.degerlendirmeler.length > 0;
 
-    if (ders.degerlendirmeler.length === 0) {
-        // Kalem yok: nötr kutuda sadece mesaj ve Düzenle butonu.
-        kutu.appendChild(eleman("strong", "", not.baslik));
-        for (const yazi of not.ek) kutu.appendChild(eleman("p", "", yazi));
-    } else {
-        // Renk: puan girilmişse ve hedef belliyse yeşil (ulaşıldı) ya da sarı (ulaşılmadı).
-        let renk = null;
-        if (durum.girilenVar && hedefHarf(ders)) renk = not === null ? "yesil" : "sari";
-        if (renk) kutu.classList.add(renk);
+    let renk = null;
+    if (kalemVar && durum.girilenVar && hedef) renk = not === null ? "yesil" : "sari";
+    let rozet = null;
+    if (renk === "yesil") rozet = durumRozeti("olumlu", "✓", "Hedefte");
+    if (renk === "sari") rozet = durumRozeti("uyari", "!", "Hedefin altında");
+    const { kart, govde } = ozetKarti({ baslik: "Sonuç", simge: "hesap", kare: "ton", ton: "mavi", rozet });
 
-        const anaYazi = eleman("strong", "ana-yazi");
-        // Anlam sadece renge bağlı kalmasın diye küçük bir simge: yeşilde ✓, sarıda !
-        if (renk) {
-            const simge = eleman("span", "durum-simgesi", renk === "yesil" ? "✓" : "!");
-            simge.setAttribute("role", "img");
-            simge.setAttribute("aria-label", renk === "yesil" ? "Hedefe ulaşıldı" : "Hedefe ulaşılmadı");
-            anaYazi.appendChild(simge);
-        }
+    if (kalemVar) {
+        const esik = hedef ? etkinEsik(hedef.alt_sinir) : null;
+        const oran = hedef && durum.girilenVar ? Math.min(Math.max(durum.kazanilan / esik, 0), 1) : 0;
+        // Halka: hedefe ulaşıldıysa yeşil; kalan kalemlerle artık ulaşılamıyorsa sarı; yoldaysa kartın tonu.
+        let halkaRengi = "";
+        if (renk === "yesil") halkaRengi = "olumlu";
+        else if (renk === "sari" && esik - durum.kazanilan > durum.kalanNormalPuan) halkaRengi = "uyari";
+        const yuzde = hedef && durum.girilenVar ? `%${Math.floor(Math.round(oran * 1e6) / 1e4)}` : "—";
         // Harf, yuvarlanmamış toplama göre bulunur.
-        anaYazi.appendChild(eleman("span", "", durum.girilenVar
-            ? `${ikiOndalik(durum.kazanilan)} puan · ${harfSeviyesi(durum.kazanilan).harf}`
-            : "Henüz puan girilmedi"));
-        if (durum.girilenVar && durum.kalanNormal.length > 0) {
-            anaYazi.appendChild(eleman("small", "", "(kalan kalemler hariç)"));
+        govde.appendChild(halkaDuzeni(
+            panelHalkasi({
+                doluluk: oran, buyuk: yuzde, renk: halkaRengi,
+                etiket: hedef && durum.girilenVar ? `Hedef puanın yüzde ${yuzde.slice(1)} kadarı kazanıldı` : "Henüz hesaplanamıyor",
+            }),
+            [
+                ["Toplam", durum.girilenVar ? `${ikiOndalik(durum.kazanilan)} puan` : "—"],
+                ["Seviye", durum.girilenVar ? harfSeviyesi(durum.kazanilan).harf : "—"],
+                ["Hedef", hedef ? `${hedef.harf} · ${hedef.alt_sinir}` : "—"],
+                ["Kalan", `${ikiOndalik(durum.kalanNormalPuan)} puan`],
+            ],
+        ));
+        if (!durum.girilenVar) {
+            const bos = icSatir({ baslik: "Henüz puan girilmedi" });
+            bos.classList.add("bos");
+            govde.appendChild(bos);
         }
-        kutu.appendChild(anaYazi);
-
-        // Alt not: hedefe ulaşılmadıysa (ya da hiç puan girilmediyse) ne gerektiği.
-        if (not) {
-            for (const yazi of [not.baslik, ...(not.ek || [])]) kutu.appendChild(eleman("p", "", yazi));
-        }
     }
-    if (not?.duzenle) {
-        const dugme = eleman("button", "dugme", "Düzenle");
-        dugme.type = "button";
-        dugme.addEventListener("click", () => dersFormunuAc(ders));
-        kutu.appendChild(dugme);
+    // Mesaj: hedefe ulaşılmadıysa (ya da kalem / hedef yoksa) ne gerektiği. Metinler sonucMesaji'ndan.
+    if (not) {
+        const satir = mesajSatiri({
+            ton: renk === "sari" ? "uyari" : "bilgi", simge: renk === "sari" ? "!" : "i",
+            baslik: not.baslik, ek: not.ek, sag: not.duzenle ? duzenleDugmesi(ders) : null,
+        });
+        satir.classList.add("sonuc-mesaji");
+        govde.appendChild(satir);
     }
-    hesapOzeti.appendChild(kutu);
-
-    if (ders.degerlendirmeler.length > 0 && durum.normalToplam < 100) {
-        hesapOzeti.appendChild(eleman("p", "kucuk-not",
-            `Değerlendirme toplamı %${asagiYuvarla(durum.normalToplam)}, eksik kalem olabilir.`));
-    }
+    hesapOzeti.appendChild(kart);
 }
 
 // Sınav bloğundan gelindiğinde o kalemin satırını kısa süre vurgular.
 function kalemSatiriniVurgula(kalemId) {
-    const satir = kalemTablosu.querySelector(`tr[data-kalem-id="${kalemId}"]`);
+    const satir = kalemListesi.querySelector(`[data-kalem-id="${kalemId}"]`);
     if (!satir) return;
     satir.classList.remove("vurgulu");
     void satir.offsetWidth;   // animasyon baştan başlasın diye
@@ -1398,7 +1480,22 @@ function kalemSatiriniVurgula(kalemId) {
 }
 
 // ---------- Sekme: Notlar ----------
-// Yazmayı bıraktıktan yaklaşık 1 saniye sonra kendiliğinden kaydedilir.
+// Yazmayı bıraktıktan yaklaşık 1 saniye sonra kendiliğinden kaydedilir. Kartın sağ üstündeki rozet
+// kayıt durumunu gösterir: "Kaydedildi", "Yazılıyor..." ya da "Kaydedilemedi".
+
+function notRozetiniYaz(yazi, ton) {
+    notDurumu.textContent = yazi;
+    notDurumu.className = `hap ${ton}`;
+}
+
+// Notun bu oturumda en son ne zaman kaydedildiğini gösterir (kayıt zamanı veritabanında tutulmaz;
+// bu oturumda kaydedilmediyse satır görünmez).
+function notZamaniniGoster(dersId) {
+    const zaman = notZamanlari.get(dersId);
+    notZamani.textContent = zaman ? `Son düzenleme: ${zaman}` : "";
+    notZamani.classList.remove("hata-yazisi");
+    notZamani.hidden = !zaman;
+}
 
 async function notlariKaydet() {
     clearTimeout(notZamanlayici);
@@ -1422,7 +1519,19 @@ async function notlariKaydet() {
     }
     // Bu arada başka derse geçildiyse ya da yeniden yazılmaya başlandıysa göstergeye dokunma.
     if (seciliDersId === dersId && notZamanlayici === null) {
-        notDurumu.textContent = basarili ? "Kaydedildi" : "Kaydedilemedi, sunucu çalışıyor mu?";
+        if (basarili) {
+            const simdi = new Date();
+            const iki = (sayi) => String(sayi).padStart(2, "0");
+            notZamanlari.set(dersId, `${iki(simdi.getDate())}.${iki(simdi.getMonth() + 1)}.${simdi.getFullYear()} `
+                + `${iki(simdi.getHours())}:${iki(simdi.getMinutes())}`);
+            notRozetiniYaz("Kaydedildi", "olumlu");
+            notZamaniniGoster(dersId);
+        } else {
+            notRozetiniYaz("Kaydedilemedi", "tehlike");
+            notZamani.textContent = "Kaydedilemedi, sunucu çalışıyor mu?";
+            notZamani.classList.add("hata-yazisi");
+            notZamani.hidden = false;
+        }
     }
 }
 
@@ -1432,7 +1541,7 @@ function notKaydiniBitir() {
 }
 
 notAlani.addEventListener("input", () => {
-    notDurumu.textContent = "Yazılıyor...";
+    notRozetiniYaz("Yazılıyor...", "soluk");
     clearTimeout(notZamanlayici);
     notZamanlayici = setTimeout(notlariKaydet, 1000);
 });
@@ -1445,44 +1554,79 @@ function tarihiGoster(tarih) {
     return tarih.split("-").reverse().join(".");
 }
 
+// Üç kart: "Ders bilgisi" (başlığında Düzenle düğmesi), "Oturumlar" ve "Değerlendirme".
+// Değeri olmayan satır ve kalemi olmayan "Değerlendirme" kartı gösterilmez.
 function bilgiyiCiz(ders) {
     bilgiIcerigi.replaceChildren();
 
-    function bolum(baslik, satirlar) {
-        bilgiIcerigi.appendChild(eleman("h3", "", baslik));
-        const liste = eleman("ul");
-        for (const yazi of satirlar) liste.appendChild(eleman("li", "", yazi));
-        bilgiIcerigi.appendChild(liste);
+    const bilgi = ozetKarti({ baslik: "Ders bilgisi", simge: "bilgi", kare: "ton", ton: "mor", rozet: duzenleDugmesi(ders) });
+    const satirlar = [["Kredi", String(ders.kredi)]];
+    if (ders.akts != null) satirlar.push(["AKTS", String(ders.akts)]);
+    satirlar.push(["Hedef harf", hedefHarf(ders) ? ders.hedef_not : "—"]);
+    if (ders.devamsizlik_hakki != null) satirlar.push(["Devamsızlık hakkı", `%${ders.devamsizlik_hakki}`]);
+    if (ders.lab_devamsizlik_hakki != null) satirlar.push(["Lab devamsızlık hakkı", `%${ders.lab_devamsizlik_hakki}`]);
+    const liste = eleman("div", "halka-satirlari");
+    for (const [etiket, deger] of satirlar) liste.appendChild(etiketDeger({ etiket, deger }));
+    bilgi.govde.appendChild(liste);
+    bilgiIcerigi.appendChild(bilgi.kart);
+
+    if (ders.oturumlar.length > 0) {
+        const oturumlar = ozetKarti({
+            baslik: "Oturumlar", simge: "takvim", kare: "ton", ton: "mor",
+            rozet: hapRozet(`${ders.oturumlar.length} oturum`),
+        });
+        for (const oturum of ders.oturumlar) {
+            oturumlar.govde.appendChild(icSatir({
+                sol: dersKaresi(ders),
+                baslik: GUN_ADLARI[oturum.gun],
+                aciklama: `${oturum.baslangic} – ${oturum.bitis} · ${oturum.derslik}`,
+                sag: oturum.tur ? hapRozet(oturum.tur, "soluk") : null,
+            }));
+        }
+        bilgiIcerigi.appendChild(oturumlar.kart);
     }
 
-    bolum("Oturumlar", ders.oturumlar.map((oturum) => {
-        const parcalar = [`${AYARLAR.gunler[oturum.gun]} ${oturum.baslangic}-${oturum.bitis}`, oturum.derslik];
-        if (oturum.tur) parcalar.push(oturum.tur);
-        return parcalar.join(" · ");
-    }));
-
-    bolum("Değerlendirme kalemleri", ders.degerlendirmeler.length === 0 ? ["Kalem eklenmemiş."]
-        : ders.degerlendirmeler.map((kalem) => {
-            const parcalar = [turBul(kalem.tur).ad, `%${kalem.agirlik}`];
-            if (kalem.tarih) parcalar.push(tarihiGoster(kalem.tarih));
-            if (kalem.saat) parcalar.push(kalem.saat + (kalem.bitis_saat ? `-${kalem.bitis_saat}` : ""));
-            if (kalem.ekstra_puan) parcalar.push("ekstra");
-            return parcalar.join(" · ");
-        }));
-
-    bolum("AKTS", [ders.akts != null ? String(ders.akts) : "—"]);
+    if (ders.degerlendirmeler.length > 0) {
+        const kalemler = ozetKarti({
+            baslik: "Değerlendirme", simge: "liste", kare: "ton", ton: "mor",
+            rozet: hapRozet(`${ders.degerlendirmeler.length} kalem`),
+        });
+        for (const kalem of ders.degerlendirmeler) {
+            // Tarih ve saat: "20.11.2026 · 10:00 – 12:00" (girilmemişse satırda görünmez).
+            const zaman = [];
+            if (kalem.tarih) zaman.push(tarihiGoster(kalem.tarih));
+            if (kalem.saat) zaman.push(kalem.saat + (kalem.bitis_saat ? ` – ${kalem.bitis_saat}` : ""));
+            const sag = eleman("span", "kalem-ozeti");
+            if (kalem.ekstra_puan) sag.appendChild(hapRozet("ekstra"));
+            sag.appendChild(eleman("strong", "", `%${kalem.agirlik}`));
+            kalemler.govde.appendChild(icSatir({ baslik: turBul(kalem.tur).ad, aciklama: zaman.join(" · "), sag }));
+        }
+        bilgiIcerigi.appendChild(kalemler.kart);
+    }
 }
 
 // ---------- Panel olayları ----------
 
 document.getElementById("panel-kapat").addEventListener("click", paneliKapat);
 document.getElementById("panel-geri").addEventListener("click", paneliKapat);
-document.getElementById("bilgi-duzenle").addEventListener("click", () => {
-    if (seciliDers()) dersFormunuAc(seciliDers());
-});
 sekmeler.addEventListener("click", (olay) => {
     const dugme = olay.target.closest("button[data-sekme]");
     if (dugme) sekmeyiGoster(dugme.dataset.sekme);
+});
+// Klavye: sol/sağ ok komşu sekmeye, Home/End ilk ve son sekmeye geçer (sekme hemen açılır).
+sekmeler.addEventListener("keydown", (olay) => {
+    const dugmeler = [...sekmeler.querySelectorAll("button[data-sekme]")];
+    const sira = dugmeler.indexOf(olay.target.closest("button[data-sekme]"));
+    if (sira === -1) return;
+    let yeni;
+    if (olay.key === "ArrowRight") yeni = (sira + 1) % dugmeler.length;
+    else if (olay.key === "ArrowLeft") yeni = (sira - 1 + dugmeler.length) % dugmeler.length;
+    else if (olay.key === "Home") yeni = 0;
+    else if (olay.key === "End") yeni = dugmeler.length - 1;
+    else return;
+    olay.preventDefault();
+    sekmeyiGoster(dugmeler[yeni].dataset.sekme);
+    dugmeler[yeni].focus();
 });
 
 // ============================================================
