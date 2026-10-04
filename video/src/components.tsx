@@ -45,9 +45,7 @@ export type Layer = { src: string; from: number; fade?: number };
 /** A piece of the screenshot lifted out and enlarged, so narrow panels stay readable. */
 export type Callout = { src: string; region: Region; from: number; to: number; width: number; x?: number; y?: number };
 
-const BAR = 38;
-
-/** A browser-like window showing real app screenshots, with an animated camera. */
+/** A window showing real app screenshots, with an animated camera. */
 export const AppWindow: React.FC<{
   layers: Layer[];
   camera?: CameraKey[];
@@ -55,7 +53,7 @@ export const AppWindow: React.FC<{
   top?: number;
   enter?: number; // frame the window starts appearing
   callouts?: Callout[];
-}> = ({ layers, camera = [], width = 1440, top = 196, enter = 0, callouts = [] }) => {
+}> = ({ layers, camera = [], width = 1440, top = 215, enter = 0, callouts = [] }) => {
   const frame = useCurrentFrame();
   const contentH = (width * SCREEN_H) / SCREEN_W;
   const base = width / SCREEN_W;
@@ -79,7 +77,7 @@ export const AppWindow: React.FC<{
         left: (1920 - width) / 2,
         top,
         width,
-        height: contentH + BAR,
+        height: contentH,
         borderRadius: 16,
         overflow: "hidden",
         background: "#0b0b0c",
@@ -89,36 +87,6 @@ export const AppWindow: React.FC<{
         transform: `translateY(${(1 - appear) * 40}px) scale(${0.97 + appear * 0.03})`,
       }}
     >
-      <div
-        style={{
-          height: BAR,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "0 16px",
-          background: "#151517",
-          borderBottom: `1px solid ${COLORS.border}`,
-        }}
-      >
-        {["#ff5f57", "#febc2e", "#28c840"].map((c) => (
-          <div key={c} style={{ width: 12, height: 12, borderRadius: 6, background: c }} />
-        ))}
-        <div
-          style={{
-            margin: "0 auto",
-            transform: "translateX(-30px)",
-            fontFamily: FONT_FAMILY,
-            fontSize: 14,
-            color: COLORS.muted,
-            background: "#0d0d0f",
-            border: `1px solid ${COLORS.border}`,
-            borderRadius: 8,
-            padding: "4px 60px",
-          }}
-        >
-          127.0.0.1:5001
-        </div>
-      </div>
       <div style={{ position: "relative", width, height: contentH, overflow: "hidden" }}>
         {layers.map((layer, i) => {
           const fade = layer.fade ?? 12;

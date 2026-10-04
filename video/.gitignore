@@ -3,3 +3,5 @@ out/
 demo/demo.db
 demo/demo_hava.json
 demo/ekranlar/
+demo/kokoro-v1.0.onnx
+demo/voices-v1.0.bin

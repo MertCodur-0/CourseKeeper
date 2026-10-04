@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   AbsoluteFill,
+  Audio,
   Easing,
   Sequence,
   continueRender,
@@ -93,16 +94,16 @@ const SyllabusScene: React.FC = () => (
     <AppWindow
       layers={[
         { src: screen("syllabus-yukle"), from: 0 },
-        { src: screen("syllabus-form"), from: 52, fade: 10 },
+        { src: screen("syllabus-form"), from: 64, fade: 10 },
       ]}
       camera={[
         { frame: 0, focus: null },
-        { frame: 28, focus: { x: 700, y: 380, w: 770, h: 330 } },
-        { frame: 48, focus: { x: 700, y: 380, w: 770, h: 330 } },
-        { frame: 72, focus: { x: 735, y: 60, w: 700, h: 960 } },
-        { frame: 104, focus: { x: 745, y: 115, w: 680, h: 290 } },
-        { frame: 132, focus: { x: 745, y: 115, w: 680, h: 290 } },
-        { frame: 162, focus: { x: 745, y: 530, w: 680, h: 420 } },
+        { frame: 30, focus: { x: 700, y: 380, w: 770, h: 330 } },
+        { frame: 58, focus: { x: 700, y: 380, w: 770, h: 330 } },
+        { frame: 86, focus: { x: 735, y: 60, w: 700, h: 960 } },
+        { frame: 122, focus: { x: 745, y: 115, w: 680, h: 290 } },
+        { frame: 152, focus: { x: 745, y: 115, w: 680, h: 290 } },
+        { frame: 190, focus: { x: 745, y: 530, w: 680, h: 420 } },
       ]}
     />
   </>
@@ -223,12 +224,12 @@ const FADE = 8;
 const SCENES: { id: string; duration: number; Component: React.FC }[] = [
   { id: "intro", duration: 70, Component: Intro },
   { id: "calendar", duration: 100, Component: CalendarScene },
-  { id: "syllabus", duration: 172, Component: SyllabusScene },
-  { id: "grades", duration: 140, Component: GradesScene },
-  { id: "attendance", duration: 165, Component: AttendanceScene },
+  { id: "syllabus", duration: 210, Component: SyllabusScene },
+  { id: "grades", duration: 150, Component: GradesScene },
+  { id: "attendance", duration: 170, Component: AttendanceScene },
   { id: "gpa", duration: 105, Component: GpaScene },
   { id: "theme", duration: 72, Component: ThemeScene },
-  { id: "end", duration: 100, Component: EndCard },
+  { id: "end", duration: 110, Component: EndCard },
 ];
 
 const starts: number[] = [];
@@ -236,6 +237,23 @@ SCENES.reduce((at, scene) => {
   starts.push(at);
   return at + scene.duration - OVERLAP;
 }, 0);
+
+// Narration: one line per scene (public/audio/narration/<scene>.wav, made by demo/anlatim.py),
+// starting NARRATION_DELAY frames after the scene begins. Lengths in seconds, used for music ducking.
+const NARRATION_DELAY = 12;
+const NARRATION: Record<string, number> = {
+  intro: 1.28,
+  calendar: 2.5,
+  syllabus: 6.29,
+  grades: 4.2,
+  attendance: 4.74,
+  gpa: 2.01,
+  theme: 1.49,
+  end: 2.73,
+};
+const VOICE_VOLUME = 1.4; // narration lines are normalized to -18 LUFS; this brings the mix to about -16 LUFS
+const MUSIC_VOLUME = 0.58; // music alone
+const MUSIC_UNDER_VOICE = 0.22; // music while the narrator speaks
 
 export const PROMO_DURATION = starts[starts.length - 1] + SCENES[SCENES.length - 1].duration;
 
@@ -262,11 +280,39 @@ const useFonts = () => {
   }, [handle]);
 };
 
+const voiceWindows = () =>
+  SCENES.map(({ id }, i) => {
+    const start = starts[i] + NARRATION_DELAY;
+    return [start, start + Math.ceil((NARRATION[id] ?? 0) * 30)] as const;
+  });
+
+/** Music volume at a frame: lowered smoothly while the narrator speaks. */
+const musicVolume = (frame: number) => {
+  const ramp = 10;
+  let duck = 0;
+  for (const [a, b] of voiceWindows()) {
+    const d = Math.min(
+      interpolate(frame, [a - ramp, a], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
+      interpolate(frame, [b, b + ramp * 2], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
+    );
+    duck = Math.max(duck, d);
+  }
+  return MUSIC_VOLUME + (MUSIC_UNDER_VOICE - MUSIC_VOLUME) * duck;
+};
+
 export const Promo: React.FC = () => {
   useFonts();
   return (
     <AbsoluteFill style={{ background: COLORS.bg }}>
       <Background />
+      <Audio src={staticFile("audio/music.wav")} volume={musicVolume} />
+      {SCENES.map(({ id }, i) =>
+        NARRATION[id] ? (
+          <Sequence key={`voice-${id}`} from={starts[i] + NARRATION_DELAY} name={`voice: ${id}`}>
+            <Audio src={staticFile(`audio/narration/${id}.wav`)} volume={VOICE_VOLUME} />
+          </Sequence>
+        ) : null,
+      )}
       {SCENES.map(({ id, duration, Component }, i) => (
         <Sequence key={id} from={starts[i]} durationInFrames={duration} name={id}>
           <SceneFade duration={duration} inFrames={i === 0 ? 1 : FADE} outFrames={i === SCENES.length - 1 ? 20 : FADE}>
