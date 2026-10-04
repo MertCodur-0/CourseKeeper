@@ -368,7 +368,7 @@ function sinavKarti() {
 // GENEL BAKIŞI ÇİZME
 // ============================================================
 
-// Üç kartı baştan çizer (Sonraki sınav, Dönem ilerlemesi, Hava durumu); kaydırma konumu korunur.
+// Üç kartı baştan çizer (Hava durumu, Dönem ilerlemesi, Sonraki sınav); kaydırma konumu korunur.
 // Bildirimleri de günceller. Hava durumu kartı elindeki son veriyi çizer, burada yeni istek atılmaz.
 // Veri her değiştiğinde çağrılır (takvimiCiz'in sonunda, ayrıca 5 dakikada bir).
 function genelBakisiCiz() {
@@ -376,7 +376,7 @@ function genelBakisiCiz() {
     if (gorunur) genelBakisKaydirmasi = genelBakis.scrollTop;
     const maddeler = durumMaddeleri();
     genelBakis.replaceChildren(
-        sinavKarti(), donemKarti(), havaKarti(),
+        havaKarti(), donemKarti(), sinavKarti(),
         eleman("p", "genel-ipucu", "Ayrıntı için takvimde bir derse tıkla"),
     );
     if (gorunur) genelBakis.scrollTop = genelBakisKaydirmasi;

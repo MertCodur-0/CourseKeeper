@@ -216,10 +216,13 @@
 
                 <!-- Sekme: Not hesabı. "Sonuç" ve "Kalemler" kartlarını static/uygulama.js çizer. -->
                 <div class="sekme-icerigi" role="tabpanel" data-sekme="hesap" id="icerik-hesap" aria-labelledby="sekme-hesap">
-                    <div id="hesap-ozeti"></div>
-                    <!-- Kalem listesi: her satırda kalem ve aldığım puan -->
-                    <div id="kalem-listesi"></div>
-                    <p class="mesaj hata" id="puan-hatasi" hidden></p>
+                    <!-- Sekmenin tek kutusu: bölümler (Sonuç, Kalemler) aynı kutuda, aralarında ince çizgi -->
+                    <section class="sekme-karti tonlu ton-mavi">
+                        <div id="hesap-ozeti"></div>
+                        <!-- Kalem listesi: her satırda kalem ve aldığım puan -->
+                        <div id="kalem-listesi"></div>
+                        <p class="mesaj hata" id="puan-hatasi" hidden></p>
+                    </section>
                 </div>
 
                 <!-- Sekme: Devamsızlık (içeriğini static/yoklama.js çizer) -->

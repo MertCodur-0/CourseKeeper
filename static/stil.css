@@ -3213,6 +3213,36 @@ kbd {
     display: none;
 }
 
+/* Sekmenin tek kutusu: sekmedeki bütün bölümler (Sonuç, Kalemler, Geçmiş oturumlar...) tek bir tonlu
+   kartın içinde durur (Notlar sekmesindeki tek kart gibi). Bölümler kendi başlığını korur ama ayrı
+   kutu görünümünü (kenarlık, zemin, iç boşluk) bırakır; aralarında ince çizgi olur. */
+.sekme-karti {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    gap: 16px;
+    padding: 14px;
+}
+
+.sekme-karti .ozet-karti {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+}
+
+.sekme-karti > * + * {
+    padding-top: 16px;
+    border-top: 1px solid var(--cizgi);
+}
+
+/* Hata mesajı ve küçük not bölüm sayılmaz: çizgisiz durur. */
+.sekme-karti > .mesaj,
+.sekme-karti > .kucuk-not {
+    padding-top: 0;
+    border-top: 0;
+}
+
 /* İç satırın içindeki rozet ve düğmeler satırın zemininden ayrışsın. */
 .ders-paneli .ic-satir .hap,
 .ders-paneli .ic-satir .ekstra-etiketi {

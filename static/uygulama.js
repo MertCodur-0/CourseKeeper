@@ -1137,6 +1137,12 @@ function mesajSatiri({ ton, simge, baslik, ek = [], sag }) {
     return satir;
 }
 
+// Sekmenin tek kutusu: sekmedeki bütün bölümler (ör. Sonuç ve Kalemler) bu kutunun içinde durur;
+// bölümler kendi başlıklarını korur, aralarında ince çizgi olur. ton: "mavi", "turkuaz", "mor".
+function sekmeKarti(ton) {
+    return eleman("section", `sekme-karti tonlu ton-${ton}`);
+}
+
 // Kart başlığındaki küçük "Düzenle" düğmesi: dersin düzenleme formunu açar.
 function duzenleDugmesi(ders) {
     const dugme = eleman("button", "dugme kucuk", "Düzenle");
@@ -1554,10 +1560,11 @@ function tarihiGoster(tarih) {
     return tarih.split("-").reverse().join(".");
 }
 
-// Üç kart: "Ders bilgisi" (başlığında Düzenle düğmesi), "Oturumlar" ve "Değerlendirme".
-// Değeri olmayan satır ve kalemi olmayan "Değerlendirme" kartı gösterilmez.
+// Tek kutuda üç bölüm: "Ders bilgisi" (başlığında Düzenle düğmesi), "Oturumlar" ve "Değerlendirme".
+// Değeri olmayan satır ve kalemi olmayan "Değerlendirme" bölümü gösterilmez.
 function bilgiyiCiz(ders) {
-    bilgiIcerigi.replaceChildren();
+    const kutu = sekmeKarti("mor");
+    bilgiIcerigi.replaceChildren(kutu);
 
     const bilgi = ozetKarti({ baslik: "Ders bilgisi", simge: "bilgi", kare: "ton", ton: "mor", rozet: duzenleDugmesi(ders) });
     const satirlar = [["Kredi", String(ders.kredi)]];
@@ -1568,7 +1575,7 @@ function bilgiyiCiz(ders) {
     const liste = eleman("div", "halka-satirlari");
     for (const [etiket, deger] of satirlar) liste.appendChild(etiketDeger({ etiket, deger }));
     bilgi.govde.appendChild(liste);
-    bilgiIcerigi.appendChild(bilgi.kart);
+    kutu.appendChild(bilgi.kart);
 
     if (ders.oturumlar.length > 0) {
         const oturumlar = ozetKarti({
@@ -1583,7 +1590,7 @@ function bilgiyiCiz(ders) {
                 sag: oturum.tur ? hapRozet(oturum.tur, "soluk") : null,
             }));
         }
-        bilgiIcerigi.appendChild(oturumlar.kart);
+        kutu.appendChild(oturumlar.kart);
     }
 
     if (ders.degerlendirmeler.length > 0) {
@@ -1601,7 +1608,7 @@ function bilgiyiCiz(ders) {
             sag.appendChild(eleman("strong", "", `%${kalem.agirlik}`));
             kalemler.govde.appendChild(icSatir({ baslik: turBul(kalem.tur).ad, aciklama: zaman.join(" · "), sag }));
         }
-        bilgiIcerigi.appendChild(kalemler.kart);
+        kutu.appendChild(kalemler.kart);
     }
 }
 

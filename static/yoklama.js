@@ -597,10 +597,11 @@ function havuzKarti(havuz) {
     return kart;
 }
 
-// Sekmenin tamamını çizer: (varsa) dönem notu, havuz kartları ve "Geçmiş oturumlar" kartı.
+// Sekmenin tamamını tek kutuda çizer: (varsa) dönem notu, havuz bölümleri ve "Geçmiş oturumlar".
 function devamsizligiCiz(ders) {
     const kaydirma = devamsizlikIcerigi.scrollTop;
-    devamsizlikIcerigi.replaceChildren();
+    const kutu = sekmeKarti("turkuaz");
+    devamsizlikIcerigi.replaceChildren(kutu);
     const donem = yoklamaVerisi.donem;
     if (!donem) {
         // Dönem girilmemiş: aynı kart stilinde boş durum.
@@ -608,13 +609,13 @@ function devamsizligiCiz(ders) {
         const satir = mesajSatiri({ ton: "uyari", simge: "!", baslik: "Yoklama takibi için dönem tarihlerini gir." });
         satir.querySelector(".ic-satir-yazisi").appendChild(donemBaglantisi("Akademik takvimi aç"));
         govde.appendChild(satir);
-        devamsizlikIcerigi.appendChild(kart);
+        kutu.appendChild(kart);
         return;
     }
     if (yoklamaVerisi.simdi.slice(0, 10) < donem.baslangic) {
-        devamsizlikIcerigi.appendChild(eleman("p", "kucuk-not", `Dönem ${tarihiGoster(donem.baslangic)} tarihinde başlıyor.`));
+        kutu.appendChild(eleman("p", "kucuk-not", `Dönem ${tarihiGoster(donem.baslangic)} tarihinde başlıyor.`));
     }
-    for (const havuz of dersYoklamasi(ders)) devamsizlikIcerigi.appendChild(havuzKarti(havuz));
+    for (const havuz of dersYoklamasi(ders)) kutu.appendChild(havuzKarti(havuz));
 
     // Geçmiş oturumlar: dersi bitmiş planlanan oturumlar, en yeni üstte. Buradan değiştirilebilir;
     // 2+ saatlik oturum ok düğmesiyle genişler ve saat saat işaretlenebilir.
@@ -654,7 +655,7 @@ function devamsizligiCiz(ders) {
             });
             govde.appendChild(dahaFazla);
         }
-        devamsizlikIcerigi.appendChild(kart);
+        kutu.appendChild(kart);
     }
     devamsizlikIcerigi.scrollTop = kaydirma;
 }
