@@ -524,13 +524,13 @@ function haftayiDegistir(kayma) {
 // DERS PENCERESİ
 // ============================================================
 
-// "+" butonuna basınca: "Syllabus ile ekle" / "Elle ekle" seçimi.
+// Alt çubuktaki "Ders ekle" tuşuna basınca: "Syllabus ile ekle" / "Elle ekle" seçimi.
 function secimEkraniniAc() {
     pencereBasligi.textContent = "Ders ekle";
     secimEkrani.hidden = false;
     syllabusEkrani.hidden = true;
     form.hidden = true;
-    pencere.showModal();
+    pencereyiAc(pencere);
 }
 
 // ---------- Syllabus ile ekleme ----------
@@ -746,7 +746,7 @@ function dersFormunuAc(baslangicVerisi = {}, syllabusUyarilari = null) {
     secimEkrani.hidden = true;
     syllabusEkrani.hidden = true;
     form.hidden = false;
-    if (!pencere.open) pencere.showModal();
+    pencereyiAc(pencere);
     formuDogrula();
     form.elements.kod.focus();
 }
@@ -907,7 +907,6 @@ async function dersiSil() {
 // OLAYLAR
 // ============================================================
 
-document.getElementById("ekle-dugmesi").addEventListener("click", secimEkraniniAc);
 document.getElementById("elle-ekle").addEventListener("click", () => dersFormunuAc());
 
 // Syllabus ile ekleme: dosya seçme butonu ve sürükle-bırak.

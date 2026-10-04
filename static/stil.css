@@ -1,19 +1,28 @@
 /* ============================================================
    RENKLER ve ÖLÇÜLER — hepsi burada, tek yerde tanımlı.
-   Tema değiştirmek için sadece bu bloğu düzenlemek yeterli.
+   İki tema var: açık (aşağıdaki :root) ve koyu (hemen altındaki blok).
+   Hangisinin geçerli olduğunu <html data-tema="acik|koyu"> belirler; bunu sayfa çizilmeden
+   önce index.html'in başındaki küçük betik yazar (Ayarlar > Tema; varsayılan koyu).
+   Ders ve sınav bloklarının 16 rengi temadan bağımsızdır (app.py: RENKLER).
    ============================================================ */
 :root {
+    color-scheme: light;          /* tarayıcının kendi bileşenleri (tarih seçici, kaydırma çubuğu) açık */
+
     /* Renkler */
     --arka-plan: #f6f7f9;         /* sayfanın arka planı */
-    --yuzey: #ffffff;             /* takvimin zemini */
+    --yuzey: #ffffff;             /* takvimin ve pencerelerin zemini */
+    --yuzey-2: #ffffff;           /* yüzeyin üstündeki parçalar: kartlar, form alanları, düğmeler */
     --panel-arka-plan: #fbfbfd;   /* sağ panelin zemini */
     --cerceve: #e3e6eb;           /* takvim ve panel çerçevesi */
     --cizgi: #e9ecf0;             /* saat (yatay) çizgileri */
     --ayrac: #f1f3f6;             /* gün (dikey) ayraçları */
-    --baslik-rengi: #1f2f56;      /* gün başlıkları (koyu lacivert) */
+    --baslik-rengi: #1f2f56;      /* ana yazı rengi (açık temada koyu lacivert) */
+    --dolgu: #1f2f56;             /* seçili düğmenin dolu zemini */
+    --dolgu-yazi: #ffffff;        /* dolu zeminin üstündeki yazı */
     --soluk-yazi: #8a93a3;        /* saat etiketleri, tarih */
     --vurgu: #3b5bdb;             /* bugünün vurgusu */
     --vurgu-zemin: #eef2ff;       /* bugünün başlık zemini */
+    --vurgu-ustu: #ffffff;        /* vurgu renkli düğmenin (Kaydet) üstündeki yazı */
     --kaydirma-cubugu: #d3d8e0;
     --hata: #e03131;              /* eksik alan çerçevesi, hata yazısı, Sil butonu */
     --uyari-yazi: #8a6100;        /* sarı uyarı yazısı */
@@ -33,6 +42,21 @@
     --tamam-yazi: #2b8a3e;        /* "Toplam: %100" yazısı (yeşil) */
     --uyari-cerceve: #e0a800;     /* sarı işaretli (kontrol edilecek) alanın çerçevesi */
 
+    /* Gölgeler ve perde */
+    --blok-golgesi: 0 4px 5px rgba(0, 0, 0, 0.18);            /* ders bloklarının gölgesi */
+    --blok-golgesi-uzerinde: 0 7px 8px rgba(0, 0, 0, 0.26);   /* fare üzerindeyken */
+    --pencere-golgesi: 0 20px 60px rgba(31, 47, 86, 0.25);
+    --perde: rgba(31, 47, 86, 0.25);                          /* açık pencerenin arkasını karartan perde */
+    --ilerleme-zemin: rgba(0, 0, 0, 0.1);                     /* ilerleme çubuğunun boş kısmı */
+
+    /* Alt çubuk (dock) */
+    --dock-zemin: #ffffff;
+    --dock-cerceve: #e3e6eb;
+    --dock-golgesi: 0 8px 28px rgba(31, 47, 86, 0.16);
+    --dock-simge: #8a93a3;        /* normal simge */
+    --dock-simge-aktif: #1f2f56;  /* aktif ve üzerine gelinen simge */
+    --dock-isik: rgba(31, 47, 86, 0.10);   /* aktif tuşun altındaki ışık hüzmesi */
+
     /* Sabit ölçüler */
     --saat-sutunu: 52px;          /* soldaki saat etiketi sütununun genişliği */
     --baslik-yuksekligi: 40px;    /* üstteki gün başlığı satırının yüksekliği */
@@ -42,6 +66,61 @@
     --gorunen-saat: 10;           /* ilk açılışta görünen satır sayısı (09 ... 18 etiketleri) */
     --en-az-sutun: 110px;         /* çok küçük pencerede en az sütun genişliği */
     --en-az-satir: 48px;          /* çok küçük pencerede en az satır yüksekliği */
+
+    /* Alt çubuk ölçüleri */
+    --dock-yuksekligi: 56px;
+    --dock-tusu: 56px;            /* bir tuşun genişliği */
+    --dock-alt-bosluk: 16px;      /* çubuğun ekranın altından uzaklığı */
+    /* Çubuğun ekranın altında kapladığı alan: pencereler ve sayfa bu kadar yukarıda biter. */
+    --dock-alani: calc(var(--dock-yuksekligi) + var(--dock-alt-bosluk) + 24px);
+}
+
+/* ---------- KOYU TEMA: sadece renkler değişir ---------- */
+:root[data-tema="koyu"] {
+    color-scheme: dark;
+
+    --arka-plan: #0b0b0c;
+    --yuzey: #131316;
+    --yuzey-2: #1a1a1f;
+    --panel-arka-plan: #131316;
+    --cerceve: rgba(255, 255, 255, 0.10);
+    --cizgi: rgba(255, 255, 255, 0.08);
+    --ayrac: rgba(255, 255, 255, 0.05);
+    --baslik-rengi: #e8e8ea;
+    --dolgu: #8ea2ff;
+    --dolgu-yazi: #0b0b0c;
+    --soluk-yazi: #9a9aa2;
+    --vurgu: #8ea2ff;                         /* açık indigo */
+    --vurgu-zemin: rgba(142, 162, 255, 0.16);
+    --vurgu-ustu: #0b0b0c;
+    --kaydirma-cubugu: rgba(255, 255, 255, 0.20);
+    --hata: #ff7b7b;
+    --uyari-yazi: #f2cc60;
+    --uyari-zemin: #2a2410;
+    --sonuc-yesil-zemin: #12281a;
+    --sonuc-yesil-cerceve: #2f6b41;
+    --sonuc-yesil-yazi: #7ddc9a;
+    --sonuc-sari-zemin: #2a2410;
+    --sonuc-sari-cerceve: #7a6220;
+    --sonuc-sari-yazi: #f2cc60;
+    --sonuc-kirmizi-zemin: #2d1516;
+    --sonuc-kirmizi-cerceve: #7a3033;
+    --sonuc-kirmizi-yazi: #ff9a9a;
+    --tamam-yazi: #7ddc9a;
+    --uyari-cerceve: #b8922a;
+
+    --blok-golgesi: 0 4px 6px rgba(0, 0, 0, 0.6);
+    --blok-golgesi-uzerinde: 0 8px 12px rgba(0, 0, 0, 0.75);
+    --pencere-golgesi: 0 24px 70px rgba(0, 0, 0, 0.7);
+    --perde: rgba(0, 0, 0, 0.6);
+    --ilerleme-zemin: rgba(255, 255, 255, 0.14);
+
+    --dock-zemin: #141416;
+    --dock-cerceve: rgba(255, 255, 255, 0.08);
+    --dock-golgesi: 0 10px 30px rgba(0, 0, 0, 0.55);
+    --dock-simge: #8d8d95;
+    --dock-simge-aktif: #ffffff;
+    --dock-isik: rgba(255, 255, 255, 0.26);
 }
 
 * {
@@ -51,6 +130,10 @@
 html, body {
     height: 100%;
     margin: 0;
+}
+
+html {
+    background: var(--arka-plan);   /* sayfa yüklenirken de temanın zemini görünsün */
 }
 
 body {
@@ -67,7 +150,8 @@ body {
     grid-template-columns: 3fr 1fr;
     gap: 16px;
     height: 100vh;
-    padding: 16px;
+    /* Altta alt çubuk (dock) kadar yer bırakılır: takvim ve panel çubuğun arkasında kalmaz. */
+    padding: 16px 16px var(--dock-alani);
 }
 
 .yan-panel {
@@ -148,7 +232,8 @@ body {
 
 .sekmeler {
     display: flex;
-    gap: 4px;
+    flex-wrap: wrap;              /* dar panelde sığmayan sekme alt satıra geçer, taşmaz */
+    gap: 0 4px;
     border-bottom: 1px solid var(--cizgi);
 }
 
@@ -160,6 +245,7 @@ body {
     color: var(--soluk-yazi);
     font: inherit;
     font-weight: 600;
+    white-space: nowrap;
     cursor: pointer;
 }
 
@@ -204,7 +290,7 @@ body {
     padding: 12px;
     border: 1px solid var(--cerceve);
     border-radius: 10px;
-    background: var(--yuzey);
+    background: var(--yuzey-2);
 }
 
 /* Hedefe ulaşıldı: yeşil. Ulaşılmadı: sarı. */
@@ -322,7 +408,7 @@ body {
     padding: 4px 6px;
     border: 1px solid var(--cerceve);
     border-radius: 7px;
-    background: var(--yuzey);
+    background: var(--yuzey-2);
     color: inherit;
     font: inherit;
     text-align: right;
@@ -365,7 +451,7 @@ body {
     padding: 8px 10px;
     border: 1px solid var(--cerceve);
     border-radius: 8px;
-    background: var(--yuzey);
+    background: var(--yuzey-2);
     color: inherit;
     font: inherit;
     line-height: 1.4;
@@ -438,7 +524,7 @@ body {
     padding: 0 10px;
     border: 1px solid var(--cerceve);
     border-radius: 8px;
-    background: var(--yuzey);
+    background: var(--yuzey-2);
     color: var(--baslik-rengi);
     font: inherit;
     font-size: 12px;
@@ -449,11 +535,6 @@ body {
 .hafta-gezinme button:hover {
     border-color: var(--vurgu);
     color: var(--vurgu);
-}
-
-/* "Dönem" butonu gezinme satırının sağ ucunda durur. */
-.hafta-gezinme .donem-dugmesi {
-    margin-left: auto;
 }
 
 .hafta-yazisi {
@@ -665,14 +746,14 @@ body {
     left: 0;
     width: 100%;
     pointer-events: none;
-    filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.18));
+    filter: drop-shadow(var(--blok-golgesi));
     transition: transform 0.12s ease, filter 0.12s ease;
 }
 
 /* Üzerine gelince bloğun tamamı çok hafif yükselir. */
 .ders-blogu:hover {
     transform: translateY(-1px);
-    filter: drop-shadow(0 7px 8px rgba(0, 0, 0, 0.26));
+    filter: drop-shadow(var(--blok-golgesi-uzerinde));
 }
 
 /* Sağ panelde seçili olan dersin blokları: şekli takip eden ince koyu çerçeve.
@@ -685,7 +766,7 @@ body {
         drop-shadow(-1.5px 0 0 var(--baslik-rengi))
         drop-shadow(0 1.5px 0 var(--baslik-rengi))
         drop-shadow(0 -1.5px 0 var(--baslik-rengi))
-        drop-shadow(0 4px 5px rgba(0, 0, 0, 0.18));
+        drop-shadow(var(--blok-golgesi));
 }
 
 .serit-etiketi.secili {
@@ -792,32 +873,6 @@ body {
 }
 
 /* ============================================================
-   "+" BUTONU: takvim alanının sol altında sabit durur
-   ============================================================ */
-.ekle-dugmesi {
-    position: absolute;
-    left: 8px;
-    bottom: 16px;
-    z-index: 5;
-    width: 36px;
-    height: 36px;
-    padding: 0 0 2px;
-    border: 0;
-    border-radius: 9px;
-    background: var(--baslik-rengi);
-    color: #ffffff;
-    font: inherit;
-    font-size: 22px;
-    line-height: 1;
-    box-shadow: 0 2px 8px rgba(31, 47, 86, 0.3);
-    cursor: pointer;
-}
-
-.ekle-dugmesi:hover {
-    background: var(--vurgu);
-}
-
-/* ============================================================
    DERS PENCERESİ ve FORM
    ============================================================ */
 
@@ -826,19 +881,40 @@ body {
     display: none !important;
 }
 
+/* Pencereler ekranın, alt çubuğun (dock) üstünde kalan kısmında ortalanır; çubuk açık pencerede
+   de görünür ve tıklanabilir kalır. Katman sırası (alttan üste): sayfa < perde < pencere <
+   üst perde < üstteki küçük pencere < dock. Açma/kapama static/dock.js'te (pencereyiAc). */
 .pencere {
+    position: fixed;
+    inset: 16px 0 var(--dock-alani) 0;
+    z-index: 50;
+    margin: auto;
     width: min(700px, 94vw);
-    max-height: 92vh;
+    max-height: calc(100vh - var(--dock-alani) - 32px);
     padding: 20px 24px;
+    overflow: auto;
     border: 1px solid var(--cerceve);
     border-radius: 14px;
     background: var(--yuzey);
     color: var(--baslik-rengi);
-    box-shadow: 0 20px 60px rgba(31, 47, 86, 0.25);
+    box-shadow: var(--pencere-golgesi);
 }
 
-.pencere::backdrop {
-    background: rgba(31, 47, 86, 0.25);
+/* Açık pencerenin arkasını karartan perde. Alt çubuğun ALTINDA kalır. */
+.perde {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: var(--perde);
+}
+
+/* Bir pencerenin üstünde açılan küçük pencere (ör. "Akademik takvimden doldur") ve onun perdesi */
+.perde.ust {
+    z-index: 54;
+}
+
+.pencere.ust-pencere {
+    z-index: 56;
 }
 
 .pencere-baslik {
@@ -888,7 +964,7 @@ body {
     padding: 28px 16px 22px;
     border: 1px solid var(--cerceve);
     border-radius: 12px;
-    background: var(--yuzey);
+    background: var(--yuzey-2);
     color: var(--baslik-rengi);
     font: inherit;
     cursor: pointer;
@@ -1018,7 +1094,7 @@ body {
     padding: 6px 8px;
     border: 1px solid var(--cerceve);
     border-radius: 7px;
-    background: var(--yuzey);
+    background: var(--yuzey-2);
     color: inherit;
     font: inherit;
 }
@@ -1206,7 +1282,7 @@ body {
     padding: 7px 16px;
     border: 1px solid var(--cerceve);
     border-radius: 8px;
-    background: var(--yuzey);
+    background: var(--yuzey-2);
     color: var(--baslik-rengi);
     font: inherit;
     cursor: pointer;
@@ -1215,7 +1291,7 @@ body {
 .dugme.ana {
     border-color: var(--vurgu);
     background: var(--vurgu);
-    color: #ffffff;
+    color: var(--vurgu-ustu);
 }
 
 .dugme.ana:disabled {
@@ -1234,8 +1310,7 @@ body {
    ============================================================ */
 .donem-penceresi {
     width: 85vw;
-    height: 85vh;
-    max-height: 85vh;
+    height: min(85vh, calc(100vh - var(--dock-alani) - 32px));
     padding: 0;                   /* iç boşluğu .donem-icerigi verir */
 }
 
@@ -1404,14 +1479,6 @@ body {
     text-align: left;
 }
 
-/* Gezinme satırındaki "Yoklama: N bekliyor" kapsülü */
-.hafta-gezinme .yoklama-kapsulu {
-    border-color: var(--uyari-cerceve);
-    border-radius: 999px;
-    background: var(--uyari-zemin);
-    color: var(--uyari-yazi);
-}
-
 /* ---------- Takvimdeki yoklama simgesi: bloğun çekirdek alanının sol üst köşesinde ---------- */
 
 .yoklama-simgesi {
@@ -1500,7 +1567,7 @@ body {
     padding: 4px 9px;
     border: 1px solid var(--cerceve);
     border-radius: 7px;
-    background: var(--yuzey);
+    background: var(--yuzey-2);
     color: var(--baslik-rengi);
     font: inherit;
     font-size: 12px;
@@ -1513,9 +1580,9 @@ body {
 
 /* Seçili durum: dolu ve kalın */
 .durum-secici button.secili {
-    border-color: var(--baslik-rengi);
-    background: var(--baslik-rengi);
-    color: #ffffff;
+    border-color: var(--dolgu);
+    background: var(--dolgu);
+    color: var(--dolgu-yazi);
     font-weight: 700;
 }
 
@@ -1525,7 +1592,7 @@ body {
     padding: 12px;
     border: 1px solid var(--cerceve);
     border-radius: 10px;
-    background: var(--yuzey);
+    background: var(--yuzey-2);
 }
 
 .yoklama-karti h3 {
@@ -1607,7 +1674,7 @@ body {
     height: 5px;
     margin-bottom: 7px;
     border-radius: 3px;
-    background: rgba(0, 0, 0, 0.1);
+    background: var(--ilerleme-zemin);
     overflow: hidden;
 }
 
@@ -1700,3 +1767,184 @@ body {
 #takvim-okuma-hatasi {
     margin-top: 12px;
 }
+
+
+/* ============================================================
+   ALT ÇUBUK (DOCK): ekranın altında, ortada yüzen gezinme çubuğu
+   Tuşlar: Takvim, Yoklama, Ders ekle, Dönem, Ayarlar (static/dock.js).
+   ============================================================ */
+.dock {
+    position: fixed;
+    left: 50%;
+    bottom: var(--dock-alt-bosluk);
+    z-index: 60;                  /* perdenin ve pencerelerin üstünde */
+    display: flex;
+    height: var(--dock-yuksekligi);
+    padding: 0 10px;
+    transform: translateX(-50%);
+    border: 1px solid var(--dock-cerceve);
+    border-radius: 16px;
+    background: var(--dock-zemin);
+    box-shadow: var(--dock-golgesi);
+}
+
+.dock button {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--dock-tusu);
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 12px;
+    background: none;
+    color: var(--dock-simge);
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.dock svg {
+    width: 23px;
+    height: 23px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.dock button:hover,
+.dock button[aria-current="page"] {
+    color: var(--dock-simge-aktif);
+}
+
+.dock button:focus-visible {
+    outline: 2px solid var(--vurgu);
+    outline-offset: -6px;
+}
+
+/* Aktif tuşun işareti: üst kenara oturan parlak çizgi ve altından tuşun dibine doğru sönen ışık.
+   Tek bir parça; aktif tuş değişince yatayda kayar (--aktif-sira: 0, 1, 2 ...). */
+.dock-isik {
+    position: absolute;
+    top: 0;
+    left: 10px;
+    width: var(--dock-tusu);
+    height: 100%;
+    pointer-events: none;
+    transform: translateX(calc(var(--aktif-sira, 0) * var(--dock-tusu)));
+    transition: transform 0.2s ease;
+}
+
+/* Çizgi: çubuğun üst kenarına oturur. */
+.dock-isik::before {
+    content: "";
+    position: absolute;
+    top: -2px;
+    left: calc(50% - 16px);
+    width: 32px;
+    height: 3px;
+    border-radius: 3px;
+    background: var(--dock-simge-aktif);
+}
+
+/* Işık hüzmesi: çizgiden aşağı doğru genişleyip sönen koni. */
+.dock-isik::after {
+    content: "";
+    position: absolute;
+    inset: 1px 2px 0;
+    background: linear-gradient(to bottom, var(--dock-isik), transparent 92%);
+    clip-path: polygon(24% 0, 76% 0, 100% 100%, 0 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dock-isik,
+    .dock button {
+        transition: none;
+    }
+}
+
+/* Yoklama tuşundaki sayı rozeti (bekleyen oturum sayısı) */
+.dock-rozet {
+    position: absolute;
+    top: 9px;
+    left: calc(50% + 4px);
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--hata);
+    color: var(--dolgu-yazi);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+}
+
+:root[data-tema="acik"] .dock-rozet {
+    color: #ffffff;
+}
+
+/* Küçük ekranda tuşlar çubuğa sığacak kadar daralır. */
+@media (max-width: 480px) {
+    :root {
+        --dock-tusu: min(56px, calc((100vw - 54px) / 5));
+    }
+}
+
+/* ============================================================
+   AYARLAR PENCERESİ (bölümlü: şimdilik sadece "Tema")
+   ============================================================ */
+.ayarlar-penceresi {
+    width: min(420px, 94vw);
+    font-size: 13px;
+}
+
+.ayar-bolumu h3 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.ayar-bolumu + .ayar-bolumu {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--cizgi);
+}
+
+/* Üç seçenekli segment: seçili olan dolu görünür. */
+.segment {
+    display: flex;
+    padding: 3px;
+    border: 1px solid var(--cerceve);
+    border-radius: 10px;
+    background: var(--yuzey-2);
+}
+
+.segment button {
+    flex: 1;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 7px;
+    background: none;
+    color: var(--soluk-yazi);
+    font: inherit;
+    cursor: pointer;
+}
+
+.segment button[aria-checked="true"] {
+    background: var(--dolgu);
+    color: var(--dolgu-yazi);
+    font-weight: 700;
+}
+
+.segment button:focus-visible {
+    outline: 2px solid var(--vurgu);
+    outline-offset: 2px;
+}
+
+.ayar-bolumu .kucuk-not {
+    margin-top: 8px;
+}
+

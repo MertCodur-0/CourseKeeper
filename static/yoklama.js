@@ -24,7 +24,6 @@ const GORUNUM_TERCIHI = "derstakip.katilimGorunumu";
 const yoklamaPenceresi = document.getElementById("yoklama-penceresi");
 const yoklamaListesi = document.getElementById("yoklama-listesi");
 const yoklamaHatasi = document.getElementById("yoklama-hatasi");
-const yoklamaKapsulu = document.getElementById("yoklama-kapsulu");
 const devamsizlikIcerigi = document.getElementById("devamsizlik-icerigi");
 
 // ============================================================
@@ -173,7 +172,7 @@ function dersYoklamasi(ders) {
 // ============================================================
 
 // Yoklama kayıtlarını ([{oturum_id, tarih, durum}]) sunucuya yazar; başarılıysa eldeki veriyi ve
-// ekranı (takvim simgeleri, panel, kapsül, açık pencere) günceller. Başarısızsa false döner.
+// ekranı (takvim simgeleri, panel, alt çubuktaki rozet, açık pencere) günceller. Başarısızsa false döner.
 async function yoklamayiKaydet(kayitlar, hataYeri) {
     try {
         await istekGonder("PUT", "/api/yoklama", { kayitlar });
@@ -198,12 +197,11 @@ async function yoklamayiKaydet(kayitlar, hataYeri) {
 // KAPSÜL, AÇILIŞ PENCERESİ ve DÖNEM UYARISI
 // ============================================================
 
-// Dersler ya da yoklama verisi yenilenince çağrılır: kapsülü ve boş paneldeki dönem uyarısını
-// günceller; sayfa açılışında bekleyen varsa pencereyi (bir kez) kendiliğinden açar.
+// Dersler ya da yoklama verisi yenilenince çağrılır: alt çubuktaki rozeti ve boş paneldeki dönem
+// uyarısını günceller; sayfa açılışında bekleyen varsa pencereyi (bir kez) kendiliğinden açar.
 function yoklamaDurumunuGuncelle() {
     const bekleyenSayisi = bekleyenYoklamalar().length;
-    yoklamaKapsulu.hidden = bekleyenSayisi === 0;
-    yoklamaKapsulu.textContent = `Yoklama: ${bekleyenSayisi} bekliyor`;
+    dockRozetiniGuncelle(bekleyenSayisi);
     // Dönem girilmemişse ve en az bir ders varsa boş paneldeki uyarı kartı görünür.
     document.getElementById("donem-uyari-karti").hidden = yoklamaVerisi.donem !== null || dersler.length === 0;
 
@@ -213,7 +211,7 @@ function yoklamaDurumunuGuncelle() {
     }
 }
 
-// Sadece yoklama verisini yeniler ve kapsülü günceller (sekmeye dönünce ve 5 dakikada bir).
+// Sadece yoklama verisini yeniler ve alt çubuktaki rozeti günceller (sekmeye dönünce ve 5 dakikada bir).
 // Pencereyi kendiliğinden açmaz, takvimi ve paneli yeniden çizmez.
 async function bekleyenleriYenile() {
     try {
@@ -221,9 +219,7 @@ async function bekleyenleriYenile() {
     } catch {
         return;   // sunucu kapalıysa sessizce geç; bir sonraki denemede düzelir
     }
-    const bekleyenSayisi = bekleyenYoklamalar().length;
-    yoklamaKapsulu.hidden = bekleyenSayisi === 0;
-    yoklamaKapsulu.textContent = `Yoklama: ${bekleyenSayisi} bekliyor`;
+    dockRozetiniGuncelle(bekleyenYoklamalar().length);
 }
 
 // ============================================================
@@ -236,12 +232,12 @@ function gunBasligi(tarih) {
     return `${GUN_ADLARI[haftaninGunu(tarih)]}, ${gun} ${AY_ADLARI[ay - 1]}`;
 }
 
+// Pencereyi açar. Bekleyen yoksa da açılır ve "Bekleyen yoklama yok" yazar (alt çubuktan açılınca).
 function yoklamaPenceresiniAc() {
     pencereListesi = bekleyenYoklamalar();
-    if (pencereListesi.length === 0) return;
     mesajGoster(yoklamaHatasi, "");
     yoklamaPenceresiniCiz();
-    if (!yoklamaPenceresi.open) yoklamaPenceresi.showModal();
+    pencereyiAc(yoklamaPenceresi);
 }
 
 // Dört durumlu seçici. yazili: düğmelerde durumun adı mı (pencere) yoksa sadece simgesi mi (panel)?
@@ -277,6 +273,12 @@ function yoklamaPenceresiniCiz() {
     const kalan = pencereListesi.filter((satir) => !yoklamaDurumu(satir.oturum.id, satir.tarih)).length;
     document.getElementById("yoklama-basligi").textContent = `Bekleyen yoklamalar (${kalan})`;
     const bugun = yoklamaVerisi.simdi.slice(0, 10);
+
+    // Liste boşsa toplu işlem düğmeleri yerine "Bekleyen yoklama yok" notu görünür.
+    const bos = pencereListesi.length === 0;
+    document.getElementById("yoklama-bos").hidden = !bos;
+    document.getElementById("yoklama-tumu-katildi").hidden = bos;
+    document.getElementById("yoklama-tumu-alinmadi").hidden = bos;
 
     const kaydirma = yoklamaListesi.scrollTop;
     yoklamaListesi.replaceChildren();
@@ -484,7 +486,6 @@ function devamsizligiCiz(ders) {
 // OLAYLAR
 // ============================================================
 
-yoklamaKapsulu.addEventListener("click", yoklamaPenceresiniAc);
 document.getElementById("yoklama-kapat").addEventListener("click", () => yoklamaPenceresi.close());
 document.getElementById("yoklama-sonra").addEventListener("click", () => yoklamaPenceresi.close());
 document.getElementById("yoklama-tumu-katildi").addEventListener("click", () => tumunuIsaretle("katildi"));
@@ -496,7 +497,7 @@ document.getElementById("yan-panel").addEventListener("click", (olay) => {
     if (olay.target.closest("[data-donem-ac]")) donemEkraniniAc();
 });
 
-// Sekmeye geri dönülünce ve 5 dakikada bir bekleyenler yeniden hesaplanır (sadece kapsül güncellenir).
+// Sekmeye geri dönülünce ve 5 dakikada bir bekleyenler yeniden hesaplanır (sadece alt çubuktaki rozet güncellenir).
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") bekleyenleriYenile();
 });

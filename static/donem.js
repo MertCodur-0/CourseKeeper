@@ -58,15 +58,17 @@ async function donemEkraniniAc() {
     gpaAlanlariniDoldur(gpaAyarlari);
     simulasyon = {};
     donemSekmesiniGoster("takvim");
-    donemPenceresi.showModal();
+    pencereyiAc(donemPenceresi);
     gpaCiz();
 }
 
 // Kapatmadan önce: akademik takvimde kaydedilmemiş değişiklik varsa onay ister.
+// Pencere kapandıysa true, kullanıcı vazgeçtiyse false döner (alt çubuk buna göre davranır).
 function donemEkraniniKapat() {
     const degisti = JSON.stringify(donemFormunuOku()) !== donemAnlik;
-    if (degisti && !confirm("Akademik takvimde kaydedilmemiş değişiklikler var. Yine de kapatılsın mı?")) return;
+    if (degisti && !confirm("Akademik takvimde kaydedilmemiş değişiklikler var. Yine de kapatılsın mı?")) return false;
     donemPenceresi.close();
+    return true;
 }
 
 function donemSekmesiniGoster(ad) {
@@ -255,7 +257,7 @@ function takvimDoldurPenceresiniAc() {
     mesajGoster(takvimOkumaHatasi, "");
     takvimOkunuyorGoster(false);
     takvimDoldurSekmesiniGoster("adres");
-    takvimDoldurPenceresi.showModal();
+    pencereyiAc(takvimDoldurPenceresi);
 }
 
 // "Okunuyor..." göstergesini açar/kapatır (açıkken adres ve dosya alanları gizlenir).
@@ -694,17 +696,9 @@ async function simulasyonuKaydet() {
 // OLAYLAR
 // ============================================================
 
-document.getElementById("donem-dugmesi").addEventListener("click", donemEkraniniAc);
+// Pencere alt çubuktaki "Dönem" tuşuyla açılır. Esc ve dışına tıklama static/dock.js'te ele alınır;
+// ikisi de donemEkraniniKapat'ı çağırır (kaydedilmemiş değişiklik varsa onay sorulur).
 document.getElementById("donem-kapat").addEventListener("click", donemEkraniniKapat);
-// Esc: tarayıcı pencereyi kendisi kapatmasın, önce kaydedilmemiş değişiklik sorulsun.
-donemPenceresi.addEventListener("cancel", (olay) => {
-    olay.preventDefault();
-    donemEkraniniKapat();
-});
-// Pencerenin dışına (arkadaki karartılmış alana) tıklanınca kapat.
-donemPenceresi.addEventListener("click", (olay) => {
-    if (olay.target === donemPenceresi) donemEkraniniKapat();
-});
 // Pencere kapanınca simülasyon sıfırlanır.
 donemPenceresi.addEventListener("close", () => { simulasyon = {}; });
 

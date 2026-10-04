@@ -4,12 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>DersTakip</title>
+    <script>
+        // Tema, sayfa çizilmeden ÖNCE uygulanır ki yüklenirken beyaz yanıp sönme olmasın.
+        // Seçim tarayıcıda saklanır: "sistem", "acik" ya da "koyu" (varsayılan koyu). Ayarlar > Tema.
+        (function () {
+            var secim = "koyu";
+            try {
+                var kayitli = localStorage.getItem("derstakip.tema");
+                if (kayitli === "sistem" || kayitli === "acik" || kayitli === "koyu") secim = kayitli;
+            } catch (hata) { /* saklama alanına ulaşılamadı: varsayılan kullanılır */ }
+            var koyu = secim === "koyu"
+                || (secim === "sistem" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+            document.documentElement.dataset.tema = koyu ? "koyu" : "acik";
+        })();
+    </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='stil.css') }}">
 </head>
 <body>
     <main class="sayfa">
 
-        <!-- SOL: takvim alanı. İçinde kayan takvim ve sabit duran "+" butonu var. -->
+        <!-- SOL: takvim alanı. -->
         <div class="takvim-alani">
 
             <!-- Hafta gezinme satırı: önceki hafta, bu haftaya dön, sonraki hafta. -->
@@ -18,10 +32,6 @@
                 <button type="button" id="bugune-don" title="Bu haftaya dön">Bugün</button>
                 <button type="button" id="sonraki-hafta" title="Sonraki hafta" aria-label="Sonraki hafta">›</button>
                 <span class="hafta-yazisi" id="hafta-yazisi"></span>
-                <!-- Bekleyen yoklama varsa görünür; basınca yoklama penceresi açılır. -->
-                <button type="button" class="yoklama-kapsulu" id="yoklama-kapsulu" hidden></button>
-                <!-- Dönem ekranını (akademik takvim ve GPA) açar. -->
-                <button type="button" class="donem-dugmesi" id="donem-dugmesi" title="Akademik takvim ve GPA">Dönem</button>
             </nav>
 
             <!-- Haftalık takvim. Hem yatay hem dikey kayan tek alan. -->
@@ -60,7 +70,6 @@
                 </div>
             </section>
 
-            <button type="button" class="ekle-dugmesi" id="ekle-dugmesi" title="Ders ekle" aria-label="Ders ekle">+</button>
         </div>
 
         <!-- SAĞ: panel. Bir kapsayıcıdır: içinde aynı anda tek bir "görünüm" gösterilir.
@@ -125,6 +134,53 @@
         </aside>
 
     </main>
+
+    <!-- ============================================================
+         ALT ÇUBUK (DOCK): ana gezinme. Pencereler açıkken de görünür ve tıklanabilir kalır.
+         Simgeler satır içi SVG'dir (dışarıdan hiçbir şey yüklenmez). Davranış: static/dock.js.
+         ============================================================ -->
+    <nav class="dock" id="dock" aria-label="Ana gezinme">
+        <span class="dock-isik" aria-hidden="true"></span>
+        <button type="button" data-tus="takvim" title="Takvim" aria-label="Takvim" aria-current="page">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.4 12 4l8 6.4V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z"/><path d="M9.5 20.5v-6h5v6"/></svg>
+        </button>
+        <button type="button" data-tus="yoklama" title="Yoklama" aria-label="Yoklama">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="m8.4 12.3 2.5 2.5 4.7-5.3"/></svg>
+            <span class="dock-rozet" id="dock-rozet" hidden></span>
+        </button>
+        <button type="button" data-tus="ders" title="Ders ekle" aria-label="Ders ekle">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8.5v7M8.5 12h7"/></svg>
+        </button>
+        <button type="button" data-tus="donem" title="Dönem" aria-label="Dönem: akademik takvim ve GPA">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 9.5 12 5l9.5 4.5L12 14z"/><path d="M6.5 11.5V16c0 1.4 2.5 2.6 5.5 2.6s5.5-1.2 5.5-2.6v-4.5"/><path d="M21.5 9.5v4.6"/></svg>
+        </button>
+        <button type="button" data-tus="ayarlar" title="Ayarlar" aria-label="Ayarlar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+    </nav>
+
+    <!-- Açık pencerenin arkasını karartan perdeler (alt çubuğun altında kalırlar). -->
+    <div class="perde" id="perde" hidden></div>
+    <div class="perde ust" id="ust-perde" hidden></div>
+
+    <!-- ============================================================
+         AYARLAR PENCERESİ: bölümlü; şimdilik tek bölüm "Tema". Yeni ayarlar yeni bölüm olarak eklenir.
+         ============================================================ -->
+    <dialog class="pencere ayarlar-penceresi" id="ayarlar-penceresi">
+        <header class="pencere-baslik">
+            <h2>Ayarlar</h2>
+            <button type="button" class="kapat" id="ayarlar-kapat" aria-label="Kapat">×</button>
+        </header>
+        <section class="ayar-bolumu">
+            <h3 id="tema-basligi">Tema</h3>
+            <div class="segment" id="tema-secimi" role="radiogroup" aria-labelledby="tema-basligi">
+                <button type="button" role="radio" data-tema-secimi="sistem">Sistem</button>
+                <button type="button" role="radio" data-tema-secimi="acik">Açık</button>
+                <button type="button" role="radio" data-tema-secimi="koyu">Koyu</button>
+            </div>
+            <p class="kucuk-not">“Sistem” seçiliyken Mac'in görünümü değişince sayfa da değişir.</p>
+        </section>
+    </dialog>
 
     <!-- ============================================================
          DERS PENCERESİ: önce seçim ekranı, sonra (syllabus yükleme ekranı ve) ders formu gösterilir.
@@ -402,6 +458,7 @@
             <button type="button" class="kapat" id="yoklama-kapat" aria-label="Kapat">×</button>
         </header>
         <div class="yoklama-listesi" id="yoklama-listesi"></div>
+        <p class="mesaj" id="yoklama-bos" hidden>Bekleyen yoklama yok. Geçmiş kayıtları dersin panelindeki “Devamsızlık” sekmesinden değiştirebilirsin.</p>
         <p class="mesaj hata" id="yoklama-hatasi" hidden></p>
         <footer class="pencere-dugmeleri">
             <button type="button" class="dugme" id="yoklama-tumu-katildi">Tümünü katıldım yap</button>
@@ -413,7 +470,7 @@
 
     <!-- "Akademik takvimden doldur" penceresi: sayfa adresi ya da dosya. Sonuç Akademik takvim
          formunu ön doldurur; Kaydet'e basılana kadar hiçbir şey kaydedilmez. -->
-    <dialog class="pencere takvim-doldur-penceresi" id="takvim-doldur-penceresi">
+    <dialog class="pencere ust-pencere takvim-doldur-penceresi" id="takvim-doldur-penceresi">
         <header class="pencere-baslik">
             <h2>Akademik takvimden doldur</h2>
             <button type="button" class="kapat" id="takvim-doldur-kapat" aria-label="Kapat">×</button>
@@ -531,5 +588,7 @@
     <script src="{{ url_for('static', filename='donem.js') }}"></script>
     <!-- Devamsızlık (yoklama): hesap, yoklama penceresi, takvim simgeleri ve paneldeki sekme. -->
     <script src="{{ url_for('static', filename='yoklama.js') }}"></script>
+    <!-- Alt çubuk (dock), pencerelerin açılıp kapanması ve tema seçimi. -->
+    <script src="{{ url_for('static', filename='dock.js') }}"></script>
 </body>
 </html>
