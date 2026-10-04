@@ -1,100 +1,102 @@
 # DersTakip
 
-Üniversite öğrencileri için kişisel akademik takip uygulaması. Derslerini, sınavlarını, notlarını, devamsızlığını ve GPA'ini tek bir ekranda takip edersin. Mac'te yerel olarak çalışır; verilerin bilgisayarında kalır.
+**English** | [Türkçe](README.tr.md)
 
-> **English:** A local, personal academic tracker for university students: weekly schedule, exams, grade targets, hour-by-hour attendance and GPA planning. Reads course syllabi and academic calendars (PDF, image or web page) with the Gemini API. Built with Flask, SQLite and plain JavaScript.
+A personal academic tracker for university students. Keep your courses, exams, grades, attendance and GPA on a single screen. Runs locally on a Mac; your data stays on your computer.
 
-<!-- Ekran görüntülerini veya GIF'leri docs/ klasörüne koyup buraya ekle, örneğin:
-![Ana ekran](docs/ana-ekran.png)
+The interface and code are in Turkish, since the app is built around the grading system used at Turkish universities (AA–DD letter grades).
+
+<!-- Put screenshots or GIFs in the docs/ folder and add them here, for example:
+![Main screen](docs/main-screen.png)
 -->
 
-## Özellikler
+## Features
 
-**Haftalık takvim**
-- Dersler ve sınavlar haftalık takvimde renkli bloklar olarak görünür.
-- Aynı saate denk gelen dersler ve sınavlar da birbirini kapatmadan gösterilir.
+**Weekly schedule**
+- Courses and exams appear as colored blocks on a weekly calendar.
+- Overlapping courses and exams are drawn without hiding each other.
 
-**Syllabus'tan ders ekleme**
-- Dersin syllabus'unu (PDF, PNG veya JPG) yükle; ders kodu, kredi, AKTS, ders saatleri, derslikler, devamsızlık hakkı ve değerlendirme kalemleri Gemini ile okunur.
-- Okunan bilgiler kaydedilmeden önce bir forma düşer. Modelin emin olmadığı veya yuvarlanan alanlar sarıyla işaretlenir, sen kontrol edip kaydedersin.
-- Belgede yazmayan bilgi uydurulmaz, boş bırakılır. Dersi elle de ekleyebilirsin.
+**Adding courses from a syllabus**
+- Upload a course syllabus (PDF, PNG or JPG) and Gemini extracts the course code, credits, ECTS, class hours, classrooms, attendance limit and grading components.
+- Nothing is saved until you review it: the extracted data fills a form, and fields the model was unsure about, or times that were rounded, are highlighted in yellow.
+- Information that isn't in the document is never invented; those fields are left empty. Courses can also be added manually.
 
-**Not hesabı**
-- Her ders için hedef harf notu seçilir (AA–DD).
-- Girdiğin notlara göre şu anki puanın, seviyen ve hedefe ulaşmak için kalan sınavlardan ne alman gerektiği hesaplanır.
-- %100'ü aşan değerlendirmeler (ekstra puan) desteklenir.
+**Grade calculator**
+- Pick a target letter grade (AA–DD) for each course.
+- Based on the grades you enter, the app shows your current score, your current letter level and what you need on the remaining exams to reach your target.
+- Grading schemes that add up to more than 100% (extra credit) are supported.
 
-**Devamsızlık**
-- Yoklama ders saati bazında tutulur: 2 saatlik dersin sadece bir saatine katılmadıysan 1 saat devamsızlık sayılır.
-- Durumlar: katıldım, katılmadım, yoklama alınmadı, ders iptal.
-- Teori ve lab için ayrı devamsızlık sınırları tanımlanabilir. Sınıra yaklaşınca uyarı gösterilir.
+**Attendance**
+- Attendance is tracked per class hour: missing only one hour of a two-hour class counts as one hour of absence.
+- Statuses: attended, absent, attendance not taken, class cancelled.
+- Lectures and labs can have separate absence limits, and you get a warning as you approach a limit.
 
-**Dönem ve GPA**
-- Akademik takvimi üniversitenin sayfa adresinden ya da PDF/görselden okutarak dönem tarihlerini, tatilleri ve sınav dönemlerini doldurabilirsin.
-- Önceki kredin ve GPA'in girilince, hedef harf notlarına göre dönem sonu genel GPA'in hesaplanır. Kredi veya AKTS ile hesaplama seçilebilir.
+**Semester and GPA**
+- Fill in semester dates, holidays and exam periods by reading your university's academic calendar from a web page, PDF or image.
+- Enter your previous credits and GPA to see your projected cumulative GPA based on your target grades. GPA can be calculated with local credits or ECTS.
 
-**Diğer**
-- Genel bakış: hava durumu, dönem ilerlemesi ve sonraki sınav.
-- Dersler, sınavlar ve notlar içinde arama (⌘K).
-- Açık ve koyu tema.
+**Other**
+- Overview panel: weather, semester progress and next exam.
+- Search across courses, exams and notes (⌘K).
+- Light and dark themes.
 
-## Kurulum
+## Installation
 
-Gerekenler: macOS, Python 3 ve (syllabus/akademik takvim okumak için) bir Gemini API anahtarı.
+Requirements: macOS, Python 3 and (for reading syllabi and academic calendars) a Gemini API key.
 
-1. Projeyi indir:
+1. Clone the project:
    ```bash
    git clone https://github.com/MertCodur-0/DersTakip.git
    cd DersTakip
    ```
 
-2. Ayar dosyasını oluştur:
+2. Create the settings file:
    ```bash
    cp .env.example .env
    ```
-   `.env` dosyasını açıp `GEMINI_API_KEY=` satırına anahtarını yaz. Anahtarı [Google AI Studio](https://aistudio.google.com/apikey) üzerinden ücretsiz alabilirsin. Anahtar olmadan da uygulama çalışır; sadece syllabus ve akademik takvim okuma kullanılamaz.
+   Open `.env` and add your key to the `GEMINI_API_KEY=` line. You can get a free key from [Google AI Studio](https://aistudio.google.com/apikey). The app runs without a key; only syllabus and academic calendar reading will be unavailable.
 
-3. `baslat.command` dosyasına çift tıkla.
-   İlk açılışta gerekli paketler kurulur, sonra uygulama tarayıcıda `http://127.0.0.1:5001` adresinde açılır. Kapatmak için açılan Terminal penceresinde `Ctrl+C`'ye bas.
+3. Double-click `baslat.command`.
+   On the first run it installs the required packages, then opens the app in your browser at `http://127.0.0.1:5001`. To stop it, press `Ctrl+C` in the Terminal window that opens.
 
-   > macOS dosyayı açmana izin vermezse: dosyaya sağ tıkla → **Aç**.
+   > If macOS won't let you open the file: right-click it → **Open**.
 
-Terminalden başlatmak istersen:
+To start it from the terminal instead:
 ```bash
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
 venv/bin/python app.py
 ```
 
-## Veriler ve gizlilik
+## Data and privacy
 
-- Bütün verilerin proje klasöründeki `derstakip.db` dosyasında tutulur. Bu dosya ve `.env` git'e eklenmez.
-- Uygulama sadece bu bilgisayardan erişilebilir (`127.0.0.1`).
-- İnternet yalnızca şunlar için kullanılır:
-  - Syllabus ve akademik takvim okuma (yüklenen dosya Gemini API'ye gönderilir, uygulamada saklanmaz),
-  - Hava durumu ([Open-Meteo](https://open-meteo.com), anahtar gerektirmez; konum yaklaşık 1 km'ye yuvarlanarak gönderilir).
-- `derstakip.db` dosyasının yedeğini düzenli olarak almanı öneririm.
+- All your data is stored in `derstakip.db` in the project folder. This file and `.env` are not committed to git.
+- The app is only reachable from your own computer (`127.0.0.1`).
+- The internet is used only for:
+  - Reading syllabi and academic calendars (the uploaded file is sent to the Gemini API and is not stored by the app),
+  - Weather ([Open-Meteo](https://open-meteo.com), no key needed; your location is rounded to about 1 km before it is sent).
+- Back up `derstakip.db` regularly.
 
-## Teknolojiler
+## Tech stack
 
-- **Sunucu:** Python, Flask
-- **Veritabanı:** SQLite
-- **Arayüz:** HTML, CSS ve sade JavaScript (harici kütüphane veya font yok)
-- **Belge okuma:** Google Gemini API (yapılandırılmış JSON çıktısı). Okuma kodu sağlayıcıdan bağımsız yazıldı; başka bir model eklemek için `syllabus.py`'deki `SyllabusParser` sınıfından türetmek yeterli.
+- **Server:** Python, Flask
+- **Database:** SQLite
+- **Frontend:** HTML, CSS and plain JavaScript (no external libraries or fonts)
+- **Document reading:** Google Gemini API with structured JSON output. The reading code is provider-independent; to add another model, subclass `SyllabusParser` in `syllabus.py`.
 
-## Proje yapısı
+## Project structure
 
 ```
-app.py               Sunucu, veritabanı ve API
-syllabus.py          Syllabus okuma (Gemini)
-akademik_takvim.py   Akademik takvim okuma (sayfa adresi veya dosya)
-hava.py              Hava durumu (Open-Meteo)
-templates/index.html Sayfa
-static/              JavaScript ve CSS
-baslat.command       Çift tıkla başlatma dosyası
+app.py               Server, database and API
+syllabus.py          Syllabus reading (Gemini)
+akademik_takvim.py   Academic calendar reading (web page or file)
+hava.py              Weather (Open-Meteo)
+templates/index.html Page
+static/              JavaScript and CSS
+baslat.command       Double-click launcher
 ```
 
-## Notlar
+## Notes
 
-- Harf notu ölçeği mutlak sistemdir: AA 90–100, BA 85–89, BB 80–84, CB 75–79, CC 70–74, DC 60–69, DD 50–59, F 0–49. Bağıl (çan) notlandırma desteklenmez. Ölçek `app.py` içinde `NOT_OLCEGI` listesinde tanımlıdır.
-- Takvim 09:00–21:00 arasını ve tam saatleri gösterir.
+- Grading uses an absolute scale: AA 90–100, BA 85–89, BB 80–84, CB 75–79, CC 70–74, DC 60–69, DD 50–59, F 0–49. Curved (relative) grading is not supported. The scale is defined in the `NOT_OLCEGI` list in `app.py`.
+- The calendar shows 09:00–21:00 and whole hours only.
