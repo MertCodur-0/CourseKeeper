@@ -172,7 +172,7 @@ function dersYoklamasi(ders) {
 // ============================================================
 
 // Yoklama kayıtlarını ([{oturum_id, tarih, durum}]) sunucuya yazar; başarılıysa eldeki veriyi ve
-// ekranı (takvim simgeleri, panel, alt çubuktaki rozet, açık pencere) günceller. Başarısızsa false döner.
+// ekranı (takvim simgeleri, panel, sol çubuktaki rozet, açık pencere) günceller. Başarısızsa false döner.
 async function yoklamayiKaydet(kayitlar, hataYeri) {
     try {
         await istekGonder("PUT", "/api/yoklama", { kayitlar });
@@ -197,11 +197,11 @@ async function yoklamayiKaydet(kayitlar, hataYeri) {
 // KAPSÜL, AÇILIŞ PENCERESİ ve DÖNEM UYARISI
 // ============================================================
 
-// Dersler ya da yoklama verisi yenilenince çağrılır: alt çubuktaki rozeti ve boş paneldeki dönem
-// uyarısını günceller; sayfa açılışında bekleyen varsa pencereyi (bir kez) kendiliğinden açar.
+// Dersler ya da yoklama verisi yenilenince çağrılır: sol çubuktaki rozeti, üstteki dönem bilgisini ve
+// boş paneldeki dönem uyarısını günceller; sayfa açılışında bekleyen varsa pencereyi (bir kez) açar.
 function yoklamaDurumunuGuncelle() {
     const bekleyenSayisi = bekleyenYoklamalar().length;
-    dockRozetiniGuncelle(bekleyenSayisi);
+    kabukBilgisiniGuncelle(bekleyenSayisi);
     // Dönem girilmemişse ve en az bir ders varsa boş paneldeki uyarı kartı görünür.
     document.getElementById("donem-uyari-karti").hidden = yoklamaVerisi.donem !== null || dersler.length === 0;
 
@@ -211,7 +211,7 @@ function yoklamaDurumunuGuncelle() {
     }
 }
 
-// Sadece yoklama verisini yeniler ve alt çubuktaki rozeti günceller (sekmeye dönünce ve 5 dakikada bir).
+// Sadece yoklama verisini yeniler; rozeti, karşılamayı ve dönem bilgisini günceller (sekmeye dönünce ve 5 dakikada bir).
 // Pencereyi kendiliğinden açmaz, takvimi ve paneli yeniden çizmez.
 async function bekleyenleriYenile() {
     try {
@@ -219,7 +219,7 @@ async function bekleyenleriYenile() {
     } catch {
         return;   // sunucu kapalıysa sessizce geç; bir sonraki denemede düzelir
     }
-    dockRozetiniGuncelle(bekleyenYoklamalar().length);
+    kabukBilgisiniGuncelle(bekleyenYoklamalar().length);
 }
 
 // ============================================================
@@ -232,7 +232,7 @@ function gunBasligi(tarih) {
     return `${GUN_ADLARI[haftaninGunu(tarih)]}, ${gun} ${AY_ADLARI[ay - 1]}`;
 }
 
-// Pencereyi açar. Bekleyen yoksa da açılır ve "Bekleyen yoklama yok" yazar (alt çubuktan açılınca).
+// Pencereyi açar. Bekleyen yoksa da açılır ve "Bekleyen yoklama yok" yazar (sol çubuktan açılınca).
 function yoklamaPenceresiniAc() {
     pencereListesi = bekleyenYoklamalar();
     mesajGoster(yoklamaHatasi, "");
@@ -497,7 +497,7 @@ document.getElementById("yan-panel").addEventListener("click", (olay) => {
     if (olay.target.closest("[data-donem-ac]")) donemEkraniniAc();
 });
 
-// Sekmeye geri dönülünce ve 5 dakikada bir bekleyenler yeniden hesaplanır (sadece alt çubuktaki rozet güncellenir).
+// Sekmeye geri dönülünce ve 5 dakikada bir bekleyenler yeniden hesaplanır (takvim ve panel yeniden çizilmez).
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") bekleyenleriYenile();
 });

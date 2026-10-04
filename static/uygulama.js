@@ -524,7 +524,7 @@ function haftayiDegistir(kayma) {
 // DERS PENCERESİ
 // ============================================================
 
-// Alt çubuktaki "Ders ekle" tuşuna basınca: "Syllabus ile ekle" / "Elle ekle" seçimi.
+// Sol çubuktaki "Ders ekle" butonuna basınca: "Syllabus ile ekle" / "Elle ekle" seçimi.
 function secimEkraniniAc() {
     pencereBasligi.textContent = "Ders ekle";
     secimEkrani.hidden = false;
@@ -1045,6 +1045,7 @@ function dersPaneliniAc(ders, kalemId = null) {
     if (kalemId != null) seciliSekme = "hesap";
     dersPaneliniCiz(dersDegisti);
     seciliVurguyuGuncelle();
+    panelCekmecesiniAc();   // dar ekranda panel sağdan çekmece olarak açılır (geniş ekranda etkisiz)
     if (kalemId != null) kalemSatiriniVurgula(kalemId);
 }
 
@@ -1053,6 +1054,7 @@ function paneliKapat() {
     seciliDersId = null;
     panelGorunumunuGoster("bos");
     seciliVurguyuGuncelle();
+    panelCekmecesiniKapat();
 }
 
 // Dersler sunucudan yeniden yüklenince çağrılır: paneli yeni veriyle tazeler,

@@ -16,23 +16,110 @@
             var koyu = secim === "koyu"
                 || (secim === "sistem" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
             document.documentElement.dataset.tema = koyu ? "koyu" : "acik";
+            // Sol çubuğun daralmış hali de aynı şekilde: sayfa açılırken zıplama olmasın.
+            try {
+                if (localStorage.getItem("derstakip.cubuk") === "dar") document.documentElement.dataset.cubuk = "dar";
+            } catch (hata) { /* varsayılan: açık */ }
         })();
     </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='stil.css') }}">
 </head>
 <body>
+    <!-- ============================================================
+         UYGULAMA KABUĞU: solda çubuk, sağında içerik (üst çubuk, karşılama satırı, takvim + panel).
+         Simgeler satır içi SVG'dir (dışarıdan hiçbir şey yüklenmez). Davranış: static/kabuk.js.
+         ============================================================ -->
+    <div class="kabuk">
+
+        <!-- SOL KENAR ÇUBUĞU: açık (248px) ya da daralmış (68px, sadece simgeler).
+             Pencereler açıkken de görünür ve tıklanabilir kalır. -->
+        <aside class="cubuk" id="cubuk" aria-label="Ana gezinme">
+            <div class="cubuk-baslik">
+                <span class="marka"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 9.5 12 5l9.5 4.5L12 14z"/><path d="M6.5 11.5V16c0 1.4 2.5 2.6 5.5 2.6s5.5-1.2 5.5-2.6v-4.5"/><path d="M21.5 9.5v4.6"/></svg><span class="cubuk-yazi">DersTakip</span></span>
+                <button type="button" class="cubuk-daralt" id="cubuk-daralt" aria-controls="cubuk" aria-expanded="true" aria-label="Çubuğu daralt" title="Çubuğu daralt (⌘B)"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4.5v15"/><path d="M20 12H9"/><path d="m13 8-4 4 4 4"/></svg></button>
+            </div>
+
+            <button type="button" class="ders-ekle-dugmesi" id="ders-ekle" data-oge="ders" data-ipucu="Ders ekle" aria-label="Ders ekle">
+                <svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                <span class="cubuk-yazi">Ders ekle</span>
+            </button>
+
+            <nav class="cubuk-menu" aria-label="Menü">
+                <button type="button" class="cubuk-ogesi" data-oge="takvim" data-ipucu="Takvim" aria-label="Takvim">
+                    <svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.4 12 4l8 6.4V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z"/><path d="M9.5 20.5v-6h5v6"/></svg>
+                    <span class="cubuk-yazi">Takvim</span>
+                </button>
+                <button type="button" class="cubuk-ogesi" data-oge="yoklama" data-ipucu="Yoklama" aria-label="Yoklama">
+                    <svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="m3.5 6.5 1.6 1.6L8 5.2"/><path d="m3.5 12.5 1.6 1.6L8 11.2"/><path d="M4 18.5h3.5"/><path d="M11.5 6.5H20.5M11.5 12.5H20.5M11.5 18.5H20.5"/></svg>
+                    <span class="cubuk-yazi">Yoklama</span><span class="cubuk-rozet" id="yoklama-rozeti" hidden></span>
+                </button>
+                <button type="button" class="cubuk-ogesi" data-oge="akademik" data-ipucu="Akademik takvim" aria-label="Akademik takvim">
+                    <svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/><path d="M7.5 14.5h4M14 14.5h2.5"/></svg>
+                    <span class="cubuk-yazi">Akademik takvim</span>
+                </button>
+                <button type="button" class="cubuk-ogesi" data-oge="gpa" data-ipucu="GPA" aria-label="GPA">
+                    <svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="m3.5 17 6-6 4 4 7-7.5"/><path d="M15 7.5h5.5V13"/></svg>
+                    <span class="cubuk-yazi">GPA</span>
+                </button>
+                <p class="grup-basligi">Sistem</p>
+                <button type="button" class="cubuk-ogesi" data-oge="ayarlar" data-ipucu="Ayarlar" aria-label="Ayarlar">
+                    <svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <span class="cubuk-yazi">Ayarlar</span>
+                </button>
+            </nav>
+
+            <div class="cubuk-alt">
+                <!-- Tema anahtarı: yazısı o an geçilecek temayı söyler ("Açık mod" / "Koyu mod"). -->
+                <button type="button" class="cubuk-ogesi" id="tema-anahtari" data-ipucu="Açık mod" aria-label="Açık mod">
+                    <svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="7" width="19" height="10" rx="5"/><circle cx="8" cy="12" r="2.4"/></svg>
+                    <span class="cubuk-yazi" id="tema-anahtari-yazisi">Açık mod</span>
+                </button>
+                <button type="button" class="cubuk-ogesi" data-oge="profil" data-ipucu="Profil" aria-label="Profil">
+                    <svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.4 3.6-5.4 7-5.4s6.2 2 7 5.4"/></svg>
+                    <span class="cubuk-yazi">Profil</span>
+                </button>
+            </div>
+        </aside>
+
+        <div class="icerik" id="icerik">
+
+            <!-- ÜST ÇUBUK: sayfa başlığı ve kullanıcı alanı -->
+            <header class="ust-cubuk">
+                <button type="button" class="ust-dugme menu-acici" id="menu-acici" aria-controls="cubuk" aria-expanded="false" aria-label="Menüyü aç"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+                <h1 class="sayfa-basligi"><span class="simge-karesi"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg></span>Takvim</h1>
+                <span class="bosluk"></span>
+                <button type="button" class="ust-dugme panel-dugmesi" id="panel-dugmesi" aria-controls="yan-panel" aria-expanded="false"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M14.5 4.5v15"/></svg>Panel</button>
+                <!-- Kullanıcı alanı: içeriğini kabuk.js yazar (ad, dönem ve hafta bilgisi). -->
+                <button type="button" class="kullanici-alani" id="kullanici-alani" aria-label="Profil ayarlarını aç">
+                    <span class="avatar" id="avatar"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.4 3.6-5.4 7-5.4s6.2 2 7 5.4"/></svg></span>
+                    <span class="kullanici-yazilari">
+                        <span class="kullanici-adi" id="kullanici-adi" hidden></span>
+                        <span class="donem-bilgisi"><span class="durum-noktasi" id="donem-noktasi"></span><span id="donem-bilgisi"></span></span>
+                    </span>
+                </button>
+            </header>
+
+            <!-- KARŞILAMA SATIRI: selam ve bugünün tarihi; sağda hafta gezinme -->
+            <div class="karsilama">
+                <div>
+                    <h2 id="karsilama-yazisi"></h2>
+                    <p id="bugunun-tarihi"></p>
+                </div>
+                <!-- Hafta gezinme: önceki hafta, gösterilen haftanın aralığı, sonraki hafta ve "Bugün". -->
+                <nav class="hafta-gezinme" aria-label="Hafta gezinme">
+                    <div class="hafta-grubu">
+                        <button type="button" id="onceki-hafta" title="Önceki hafta" aria-label="Önceki hafta">‹</button>
+                        <span class="hafta-araligi"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg><span id="hafta-yazisi"></span></span>
+                        <button type="button" id="sonraki-hafta" title="Sonraki hafta" aria-label="Sonraki hafta">›</button>
+                    </div>
+                    <button type="button" id="bugune-don" title="Bu haftaya dön">Bugün</button>
+                </nav>
+            </div>
+
     <main class="sayfa">
 
-        <!-- SOL: takvim alanı. -->
+        <!-- SOL: takvim kartı. -->
         <div class="takvim-alani">
-
-            <!-- Hafta gezinme satırı: önceki hafta, bu haftaya dön, sonraki hafta. -->
-            <nav class="hafta-gezinme">
-                <button type="button" id="onceki-hafta" title="Önceki hafta" aria-label="Önceki hafta">‹</button>
-                <button type="button" id="bugune-don" title="Bu haftaya dön">Bugün</button>
-                <button type="button" id="sonraki-hafta" title="Sonraki hafta" aria-label="Sonraki hafta">›</button>
-                <span class="hafta-yazisi" id="hafta-yazisi"></span>
-            </nav>
 
             <!-- Haftalık takvim. Hem yatay hem dikey kayan tek alan. -->
             <section class="takvim" id="takvim">
@@ -135,50 +222,45 @@
 
     </main>
 
-    <!-- ============================================================
-         ALT ÇUBUK (DOCK): ana gezinme. Pencereler açıkken de görünür ve tıklanabilir kalır.
-         Simgeler satır içi SVG'dir (dışarıdan hiçbir şey yüklenmez). Davranış: static/dock.js.
-         ============================================================ -->
-    <nav class="dock" id="dock" aria-label="Ana gezinme">
-        <span class="dock-isik" aria-hidden="true"></span>
-        <button type="button" data-tus="takvim" title="Takvim" aria-label="Takvim" aria-current="page">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.4 12 4l8 6.4V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z"/><path d="M9.5 20.5v-6h5v6"/></svg>
-        </button>
-        <button type="button" data-tus="yoklama" title="Yoklama" aria-label="Yoklama">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="m8.4 12.3 2.5 2.5 4.7-5.3"/></svg>
-            <span class="dock-rozet" id="dock-rozet" hidden></span>
-        </button>
-        <button type="button" data-tus="ders" title="Ders ekle" aria-label="Ders ekle">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8.5v7M8.5 12h7"/></svg>
-        </button>
-        <button type="button" data-tus="donem" title="Dönem" aria-label="Dönem: akademik takvim ve GPA">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 9.5 12 5l9.5 4.5L12 14z"/><path d="M6.5 11.5V16c0 1.4 2.5 2.6 5.5 2.6s5.5-1.2 5.5-2.6v-4.5"/><path d="M21.5 9.5v4.6"/></svg>
-        </button>
-        <button type="button" data-tus="ayarlar" title="Ayarlar" aria-label="Ayarlar">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-        </button>
-    </nav>
+        </div>
+    </div>
 
-    <!-- Açık pencerenin arkasını karartan perdeler (alt çubuğun altında kalırlar). -->
+    <!-- Açık pencerenin arkasını karartan perdeler (sol çubuğu örtmezler). -->
     <div class="perde" id="perde" hidden></div>
     <div class="perde ust" id="ust-perde" hidden></div>
+    <!-- Dar ekrandaki çekmecelerin (sol menü, sağ panel) arkasındaki perde. -->
+    <div class="cekmece-perdesi" id="cekmece-perdesi" hidden></div>
 
     <!-- ============================================================
-         AYARLAR PENCERESİ: bölümlü; şimdilik tek bölüm "Tema". Yeni ayarlar yeni bölüm olarak eklenir.
+         AYARLAR PENCERESİ: bölümlü ("Görünüm" ve "Profil"). Yeni ayarlar yeni bölüm olarak eklenir.
+         Değerler tarayıcıda saklanır (küçük arayüz tercihleri).
          ============================================================ -->
     <dialog class="pencere ayarlar-penceresi" id="ayarlar-penceresi">
         <header class="pencere-baslik">
             <h2>Ayarlar</h2>
             <button type="button" class="kapat" id="ayarlar-kapat" aria-label="Kapat">×</button>
         </header>
-        <section class="ayar-bolumu">
-            <h3 id="tema-basligi">Tema</h3>
-            <div class="segment" id="tema-secimi" role="radiogroup" aria-labelledby="tema-basligi">
+        <section class="ayar-bolumu" id="ayar-gorunum">
+            <h3 id="tema-basligi">Görünüm</h3>
+            <div class="segment" id="tema-secimi" role="radiogroup" aria-label="Tema">
                 <button type="button" role="radio" data-tema-secimi="sistem">Sistem</button>
                 <button type="button" role="radio" data-tema-secimi="acik">Açık</button>
                 <button type="button" role="radio" data-tema-secimi="koyu">Koyu</button>
             </div>
             <p class="kucuk-not">“Sistem” seçiliyken Mac'in görünümü değişince sayfa da değişir.</p>
+        </section>
+        <section class="ayar-bolumu" id="ayar-profil">
+            <h3>Profil</h3>
+            <form class="ders-formu" id="profil-formu" novalidate>
+                <label class="alan">
+                    <span>Adın <small>(opsiyonel)</small></span>
+                    <span class="profil-satiri">
+                        <input type="text" id="profil-adi" maxlength="30" autocomplete="off" placeholder="Karşılamada ve üst çubukta görünür">
+                        <button type="submit" class="dugme ana">Kaydet</button>
+                    </span>
+                </label>
+                <span class="not-durumu" id="profil-durumu"></span>
+            </form>
         </section>
     </dialog>
 
@@ -588,7 +670,7 @@
     <script src="{{ url_for('static', filename='donem.js') }}"></script>
     <!-- Devamsızlık (yoklama): hesap, yoklama penceresi, takvim simgeleri ve paneldeki sekme. -->
     <script src="{{ url_for('static', filename='yoklama.js') }}"></script>
-    <!-- Alt çubuk (dock), pencerelerin açılıp kapanması ve tema seçimi. -->
-    <script src="{{ url_for('static', filename='dock.js') }}"></script>
+    <!-- Kabuk: sol çubuk, üst çubuk, karşılama, pencerelerin açılıp kapanması, tema ve profil. -->
+    <script src="{{ url_for('static', filename='kabuk.js') }}"></script>
 </body>
 </html>

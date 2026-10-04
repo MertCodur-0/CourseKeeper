@@ -1,126 +1,139 @@
 /* ============================================================
-   RENKLER ve ÖLÇÜLER — hepsi burada, tek yerde tanımlı.
+   TASARIM DEĞİŞKENLERİ — renkler ve ölçüler, hepsi burada, tek yerde.
    İki tema var: açık (aşağıdaki :root) ve koyu (hemen altındaki blok).
    Hangisinin geçerli olduğunu <html data-tema="acik|koyu"> belirler; bunu sayfa çizilmeden
-   önce index.html'in başındaki küçük betik yazar (Ayarlar > Tema; varsayılan koyu).
+   önce index.html'in başındaki küçük betik yazar (Ayarlar > Görünüm; varsayılan koyu).
    Ders ve sınav bloklarının 16 rengi temadan bağımsızdır (app.py: RENKLER).
    ============================================================ */
 :root {
     color-scheme: light;          /* tarayıcının kendi bileşenleri (tarih seçici, kaydırma çubuğu) açık */
 
-    /* Renkler */
-    --arka-plan: #f6f7f9;         /* sayfanın arka planı */
-    --yuzey: #ffffff;             /* takvimin ve pencerelerin zemini */
-    --yuzey-2: #ffffff;           /* yüzeyin üstündeki parçalar: kartlar, form alanları, düğmeler */
-    --panel-arka-plan: #fbfbfd;   /* sağ panelin zemini */
-    --cerceve: #e3e6eb;           /* takvim ve panel çerçevesi */
-    --cizgi: #e9ecf0;             /* saat (yatay) çizgileri */
-    --ayrac: #f1f3f6;             /* gün (dikey) ayraçları */
-    --baslik-rengi: #1f2f56;      /* ana yazı rengi (açık temada koyu lacivert) */
-    --dolgu: #1f2f56;             /* seçili düğmenin dolu zemini */
+    /* ---- Yüzeyler ve yazı ---- */
+    --arka-plan: #f6f6f8;         /* sayfa */
+    --cubuk-zemin: #fbfbfc;       /* sol kenar çubuğu */
+    --yuzey: #ffffff;             /* kartlar: takvim, sağ panel, pencereler */
+    --yuzey-2: #f1f1f4;           /* kart içi satır / ikincil yüzey: iç kartlar, form alanları, düğmeler */
+    --panel-arka-plan: #ffffff;
+    --cerceve: rgba(0, 0, 0, 0.09);          /* kart kenarlığı */
+    --cerceve-parlak: rgba(0, 0, 0, 0.20);   /* üzerine gelinen kartın kenarlığı */
+    --cizgi: rgba(0, 0, 0, 0.07);            /* saat (yatay) çizgileri, ayırıcılar */
+    --ayrac: rgba(0, 0, 0, 0.045);           /* gün (dikey) ayraçları */
+    --baslik-rengi: #17181c;      /* ana yazı */
+    --soluk-yazi: #626875;        /* açıklamalar, saat etiketleri */
+    --dolgu: #17181c;             /* seçili düğmenin dolu zemini */
     --dolgu-yazi: #ffffff;        /* dolu zeminin üstündeki yazı */
-    --soluk-yazi: #8a93a3;        /* saat etiketleri, tarih */
-    --vurgu: #3b5bdb;             /* bugünün vurgusu */
-    --vurgu-zemin: #eef2ff;       /* bugünün başlık zemini */
-    --vurgu-ustu: #ffffff;        /* vurgu renkli düğmenin (Kaydet) üstündeki yazı */
-    --kaydirma-cubugu: #d3d8e0;
-    --hata: #e03131;              /* eksik alan çerçevesi, hata yazısı, Sil butonu */
-    --uyari-yazi: #8a6100;        /* sarı uyarı yazısı */
-    --uyari-zemin: #fff4cc;       /* sarı uyarı zemini */
-    /* Sağ paneldeki sonuç kutusunun renkleri (zemin, kenarlık, yazı). Kutu kendi zeminini ve
-       yazı rengini birlikte taşır; tema değişirse sadece bu altı değeri değiştirmek yeterli. */
-    --sonuc-yesil-zemin: #e3f6e8;     /* hedefe ulaşıldı */
-    --sonuc-yesil-cerceve: #8fd0a0;
-    --sonuc-yesil-yazi: #17602c;
-    --sonuc-sari-zemin: #fff4cc;      /* hedefe ulaşılmadı */
-    --sonuc-sari-cerceve: #e6c455;
-    --sonuc-sari-yazi: #6b4a00;
-    --sonuc-kirmizi-zemin: #fde8e8;   /* devamsızlık hakkı bitti / sınır aşıldı */
-    --sonuc-kirmizi-cerceve: #f0a3a3;
-    --sonuc-kirmizi-yazi: #8f1d1d;
+    --vurgu: #3b6cf0;             /* vurgu (accent) */
+    --vurgu-zemin: rgba(59, 108, 240, 0.12);   /* vurgunun şeffaf zemini: aktif öğe, bugün */
+    --vurgu-yazi: #2648b8;        /* vurgu zemininin üstündeki yazı (okunur olsun diye biraz koyu) */
+    --vurgu-ustu: #ffffff;        /* vurgu renkli düğmenin üstündeki yazı */
+    --kaydirma-cubugu: rgba(0, 0, 0, 0.22);
 
-    --tamam-yazi: #2b8a3e;        /* "Toplam: %100" yazısı (yeşil) */
-    --uyari-cerceve: #e0a800;     /* sarı işaretli (kontrol edilecek) alanın çerçevesi */
+    /* ---- Ton renkleri: her birinin kendisi ve bu temada okunur yazı rengi ----
+       Anlam sadece renge bağlı değildir; ✓ ! ✗ simgeleri de kullanılır. */
+    --ton-olumlu: #4ade80;   --ton-olumlu-yazi: #166534;    /* yeşil */
+    --ton-uyari: #facc15;    --ton-uyari-yazi: #854d0e;     /* sarı */
+    --ton-tehlike: #f87171;  --ton-tehlike-yazi: #b91c1c;   /* kırmızı */
+    --ton-bilgi: #818cf8;    --ton-bilgi-yazi: #4338ca;     /* indigo */
+    --ton-turkuaz: #2dd4bf;  --ton-turkuaz-yazi: #0f766e;
+    /* Simge karelerinin renkleri */
+    --kare-kirmizi: #e8736f;
+    --kare-yesil: #5ac98b;
+    --kare-mor: #7c7cf0;
+    --kare-mavi: #4f8ef7;
+    --kare-turkuaz: #5eead4;
 
-    /* Gölgeler ve perde */
+    /* Tonlu kartlar: üstte tonun çok hafif geçişi, kenarlıkta tonun soluk hali, yazıda okunur hali.
+       (Sonuç kutusu, devamsızlık sınırı, uyarı notları bunları kullanır.) */
+    --sonuc-yesil-zemin: rgba(22, 163, 74, 0.11);
+    --sonuc-yesil-cerceve: rgba(22, 163, 74, 0.28);
+    --sonuc-yesil-yazi: var(--ton-olumlu-yazi);
+    --sonuc-sari-zemin: rgba(202, 138, 4, 0.13);
+    --sonuc-sari-cerceve: rgba(202, 138, 4, 0.32);
+    --sonuc-sari-yazi: var(--ton-uyari-yazi);
+    --sonuc-kirmizi-zemin: rgba(220, 38, 38, 0.09);
+    --sonuc-kirmizi-cerceve: rgba(220, 38, 38, 0.28);
+    --sonuc-kirmizi-yazi: var(--ton-tehlike-yazi);
+    --hata: #dc2626;                         /* eksik alan çerçevesi, hata yazısı, Sil butonu */
+    --uyari-yazi: var(--ton-uyari-yazi);     /* sarı uyarı notu */
+    --uyari-zemin: rgba(202, 138, 4, 0.13);
+    --uyari-cerceve: #ca8a04;                /* sarı işaretli (kontrol edilecek) alanın çerçevesi */
+    --tamam-yazi: var(--ton-olumlu-yazi);    /* "Toplam: %100" yazısı */
+
+    /* ---- Gölgeler ve perde ---- */
     --blok-golgesi: 0 4px 5px rgba(0, 0, 0, 0.18);            /* ders bloklarının gölgesi */
     --blok-golgesi-uzerinde: 0 7px 8px rgba(0, 0, 0, 0.26);   /* fare üzerindeyken */
-    --pencere-golgesi: 0 20px 60px rgba(31, 47, 86, 0.25);
-    --perde: rgba(31, 47, 86, 0.25);                          /* açık pencerenin arkasını karartan perde */
+    --pencere-golgesi: 0 24px 70px rgba(20, 22, 30, 0.22);
+    --perde: rgba(20, 22, 30, 0.28);                          /* açık pencerenin arkasını karartan perde */
     --ilerleme-zemin: rgba(0, 0, 0, 0.1);                     /* ilerleme çubuğunun boş kısmı */
 
-    /* Alt çubuk (dock) */
-    --dock-zemin: #ffffff;
-    --dock-cerceve: #e3e6eb;
-    --dock-golgesi: 0 8px 28px rgba(31, 47, 86, 0.16);
-    --dock-simge: #8a93a3;        /* normal simge */
-    --dock-simge-aktif: #1f2f56;  /* aktif ve üzerine gelinen simge */
-    --dock-isik: rgba(31, 47, 86, 0.10);   /* aktif tuşun altındaki ışık hüzmesi */
+    /* ---- Ölçüler ---- */
+    --kart-kosesi: 20px;          /* kartların köşe yuvarlaklığı */
+    --ic-kose: 16px;              /* kart içi satırların köşesi */
+    --ust-cubuk-yuksekligi: 56px; /* üst çubuk ve sol çubuğun başlık satırı (alt çizgileri hizalı) */
+    --cubuk-acik: 248px;          /* sol çubuğun açık genişliği */
+    --cubuk-dar: 68px;            /* daralmış (sadece simgeler) genişliği */
+    --cubuk-genisligi: var(--cubuk-acik);   /* o anki genişlik: pencereler ve perde buna göre yerleşir */
+    --gecis: 0.18s ease;          /* bütün geçişlerin süresi */
 
-    /* Sabit ölçüler */
+    /* Takvim ızgarası */
     --saat-sutunu: 52px;          /* soldaki saat etiketi sütununun genişliği */
     --baslik-yuksekligi: 40px;    /* üstteki gün başlığı satırının yüksekliği */
-    --gezinme-yuksekligi: 28px;   /* takvimin üstündeki hafta gezinme satırı */
-    --gezinme-boslugu: 8px;       /* gezinme satırı ile takvim arası */
     --gorunen-gun: 5;             /* ilk açılışta görünen gün sayısı (Pzt-Cum) */
-    --gorunen-saat: 10;           /* ilk açılışta görünen satır sayısı (09 ... 18 etiketleri) */
+    --gorunen-saat: 9;            /* ilk açılışta görünen satır sayısı (09:00-18:00) */
     --en-az-sutun: 110px;         /* çok küçük pencerede en az sütun genişliği */
     --en-az-satir: 48px;          /* çok küçük pencerede en az satır yüksekliği */
-
-    /* Alt çubuk ölçüleri */
-    --dock-yuksekligi: 56px;
-    --dock-tusu: 56px;            /* bir tuşun genişliği */
-    --dock-alt-bosluk: 16px;      /* çubuğun ekranın altından uzaklığı */
-    /* Çubuğun ekranın altında kapladığı alan: pencereler ve sayfa bu kadar yukarıda biter. */
-    --dock-alani: calc(var(--dock-yuksekligi) + var(--dock-alt-bosluk) + 24px);
 }
 
 /* ---------- KOYU TEMA: sadece renkler değişir ---------- */
 :root[data-tema="koyu"] {
     color-scheme: dark;
 
-    --arka-plan: #0b0b0c;
-    --yuzey: #131316;
-    --yuzey-2: #1a1a1f;
-    --panel-arka-plan: #131316;
-    --cerceve: rgba(255, 255, 255, 0.10);
+    --arka-plan: #050505;
+    --cubuk-zemin: #0e0e10;
+    --yuzey: #09090b;
+    --yuzey-2: #1a1a1d;
+    --panel-arka-plan: #09090b;
+    --cerceve: rgba(255, 255, 255, 0.09);
+    --cerceve-parlak: rgba(255, 255, 255, 0.20);
     --cizgi: rgba(255, 255, 255, 0.08);
     --ayrac: rgba(255, 255, 255, 0.05);
-    --baslik-rengi: #e8e8ea;
-    --dolgu: #8ea2ff;
-    --dolgu-yazi: #0b0b0c;
+    --baslik-rengi: #ececee;
     --soluk-yazi: #9a9aa2;
-    --vurgu: #8ea2ff;                         /* açık indigo */
-    --vurgu-zemin: rgba(142, 162, 255, 0.16);
-    --vurgu-ustu: #0b0b0c;
-    --kaydirma-cubugu: rgba(255, 255, 255, 0.20);
-    --hata: #ff7b7b;
-    --uyari-yazi: #f2cc60;
-    --uyari-zemin: #2a2410;
-    --sonuc-yesil-zemin: #12281a;
-    --sonuc-yesil-cerceve: #2f6b41;
-    --sonuc-yesil-yazi: #7ddc9a;
-    --sonuc-sari-zemin: #2a2410;
-    --sonuc-sari-cerceve: #7a6220;
-    --sonuc-sari-yazi: #f2cc60;
-    --sonuc-kirmizi-zemin: #2d1516;
-    --sonuc-kirmizi-cerceve: #7a3033;
-    --sonuc-kirmizi-yazi: #ff9a9a;
-    --tamam-yazi: #7ddc9a;
+    --dolgu: #ececee;
+    --dolgu-yazi: #09090b;
+    --vurgu: #6ea0ff;
+    --vurgu-zemin: rgba(110, 160, 255, 0.12);
+    --vurgu-yazi: #6ea0ff;
+    --vurgu-ustu: #050505;
+    --kaydirma-cubugu: rgba(255, 255, 255, 0.18);
+
+    /* Koyu zeminde ton renklerinin kendisi okunur. */
+    --ton-olumlu-yazi: #4ade80;
+    --ton-uyari-yazi: #facc15;
+    --ton-tehlike-yazi: #f87171;
+    --ton-bilgi-yazi: #a5b0ff;
+    --ton-turkuaz-yazi: #2dd4bf;
+
+    --sonuc-yesil-zemin: rgba(74, 222, 128, 0.10);
+    --sonuc-yesil-cerceve: rgba(74, 222, 128, 0.20);
+    --sonuc-sari-zemin: rgba(250, 204, 21, 0.10);
+    --sonuc-sari-cerceve: rgba(250, 204, 21, 0.20);
+    --sonuc-kirmizi-zemin: rgba(248, 113, 113, 0.10);
+    --sonuc-kirmizi-cerceve: rgba(248, 113, 113, 0.20);
+    --hata: #f87171;
+    --uyari-zemin: rgba(250, 204, 21, 0.10);
     --uyari-cerceve: #b8922a;
 
     --blok-golgesi: 0 4px 6px rgba(0, 0, 0, 0.6);
     --blok-golgesi-uzerinde: 0 8px 12px rgba(0, 0, 0, 0.75);
-    --pencere-golgesi: 0 24px 70px rgba(0, 0, 0, 0.7);
-    --perde: rgba(0, 0, 0, 0.6);
+    --pencere-golgesi: 0 24px 70px rgba(0, 0, 0, 0.75);
+    --perde: rgba(0, 0, 0, 0.55);
     --ilerleme-zemin: rgba(255, 255, 255, 0.14);
+}
 
-    --dock-zemin: #141416;
-    --dock-cerceve: rgba(255, 255, 255, 0.08);
-    --dock-golgesi: 0 10px 30px rgba(0, 0, 0, 0.55);
-    --dock-simge: #8d8d95;
-    --dock-simge-aktif: #ffffff;
-    --dock-isik: rgba(255, 255, 255, 0.26);
+/* Sol çubuk daralmışken genişlik değişkeni küçülür (durum: <html data-cubuk="dar">). */
+:root[data-cubuk="dar"] {
+    --cubuk-genisligi: var(--cubuk-dar);
 }
 
 * {
@@ -130,6 +143,7 @@
 html, body {
     height: 100%;
     margin: 0;
+    overflow: hidden;             /* sayfanın kendisi kaymaz; takvim, panel ve çubuk kendi içinde kayar */
 }
 
 html {
@@ -138,20 +152,572 @@ html {
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    font-size: 14px;
     background: var(--arka-plan);
     color: var(--baslik-rengi);
+    font-variant-numeric: tabular-nums;   /* sayılar eşit genişlikte: tablolar ve saatler hizalı durur */
+}
+
+/* İnce, temaya uyan kaydırma çubukları (her yerde) */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--kaydirma-cubugu) transparent;
+}
+
+/* Hareket azaltma tercihi açıksa bütün geçişler ve animasyonlar kapalı. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition: none !important;
+        animation: none !important;
+    }
+}
+
+/* Çizgi simgeler (satır içi SVG): 20px, ince çizgi, rengini yazıdan alır. */
+.simge {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 /* ============================================================
-   SAYFA DÜZENİ: solda takvim (%75), sağda panel (%25)
+   ORTAK BİLEŞENLER: kart, hap rozet, simge karesi
+   (Tonlu kart ve iç satır görünümleri aşağıda ilgili parçalarda: sonuç kutusu, devamsızlık kartı.)
    ============================================================ */
-.sayfa {
+
+/* Kart: yuvarlak köşe, ince kenarlık, yüzey rengi. Üzerine gelince kenarlığı hafifçe parlar. */
+.kart {
+    border: 1px solid var(--cerceve);
+    border-radius: var(--kart-kosesi);
+    background: var(--yuzey);
+    transition: border-color var(--gecis);
+}
+
+.kart:hover {
+    border-color: var(--cerceve-parlak);
+}
+
+/* Hap rozet: tam yuvarlak, ikincil yüzey üstünde ton renginde küçük yazı. */
+.hap {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: var(--yuzey-2);
+    color: var(--ton-bilgi-yazi);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/* Simge karesi: renkli zemin üstünde koyu simge. */
+.simge-karesi {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: var(--kare-mavi);
+    color: #0b0b0d;
+}
+
+.simge-karesi .simge {
+    width: 18px;
+    height: 18px;
+}
+
+/* ============================================================
+   UYGULAMA KABUĞU: solda çubuk, sağında içerik (üst çubuk, karşılama, takvim + panel)
+   Ekran yüksekliğini doldurur; sayfa kaymaz.
+   ============================================================ */
+.kabuk {
     display: grid;
-    grid-template-columns: 3fr 1fr;
-    gap: 16px;
+    grid-template-columns: var(--cubuk-genisligi) minmax(0, 1fr);
     height: 100vh;
-    /* Altta alt çubuk (dock) kadar yer bırakılır: takvim ve panel çubuğun arkasında kalmaz. */
-    padding: 16px 16px var(--dock-alani);
+    transition: grid-template-columns var(--gecis);
+}
+
+.icerik {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+/* ---------- Sol kenar çubuğu ---------- */
+
+.cubuk {
+    position: relative;
+    z-index: 70;                  /* açık pencerelerin ve perdenin yanında hep tıklanabilir */
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    min-height: 0;
+    padding: 0 12px 12px;
+    border-right: 1px solid var(--cerceve);
+    background: var(--cubuk-zemin);
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+/* Başlık satırı: üst çubukla aynı yükseklikte; alt çizgisi üst çubuğun çizgisiyle birleşir. */
+.cubuk-baslik {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    height: var(--ust-cubuk-yuksekligi);
+    margin: 0 -12px 8px;
+    padding: 0 12px 0 20px;
+    border-bottom: 1px solid var(--cerceve);
+}
+
+.marka {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    white-space: nowrap;
+    transition: opacity var(--gecis);
+}
+
+.marka .simge {
+    width: 24px;
+    height: 24px;
+    color: var(--vurgu);
+}
+
+/* Çubuktaki bütün tıklanabilir öğeler (daralt düğmesi, menü öğeleri, tema, profil) */
+.cubuk button {
+    border: 0;
+    background: none;
+    color: var(--soluk-yazi);
+    font: inherit;
+    cursor: pointer;
+    transition: background var(--gecis), color var(--gecis), opacity var(--gecis);
+}
+
+.cubuk button:focus-visible,
+.ust-cubuk button:focus-visible,
+.karsilama button:focus-visible {
+    outline: 2px solid var(--vurgu);
+    outline-offset: 2px;
+}
+
+.cubuk .cubuk-daralt {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+}
+
+.cubuk .cubuk-daralt:hover {
+    background: var(--yuzey-2);
+    color: var(--baslik-rengi);
+}
+
+/* "Ders ekle": vurgu renginde dolu buton. */
+.cubuk .ders-ekle-dugmesi {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-shrink: 0;
+    height: 44px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    background: var(--vurgu);
+    color: var(--vurgu-ustu);
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.cubuk .ders-ekle-dugmesi:hover {
+    filter: brightness(1.08);
+}
+
+.cubuk .ders-ekle-dugmesi .cubuk-yazi {
+    flex: none;
+}
+
+.cubuk-menu,
+.cubuk-alt {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Alt grup (tema, profil) çubuğun dibine yaslanır; üstünde ayırıcı çizgi. */
+.cubuk-alt {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--cerceve);
+}
+
+.grup-basligi {
+    margin: 12px 0 2px;
+    padding: 0 12px;
+    font-size: 14px;
+    color: var(--soluk-yazi);
+}
+
+/* Menü öğesi: 44px yükseklik, 12px köşe, simge + yazı. */
+.cubuk .cubuk-ogesi {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    width: 100%;
+    height: 44px;
+    padding: 0 12px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 500;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.cubuk .cubuk-ogesi:hover {
+    background: var(--yuzey-2);
+    color: var(--baslik-rengi);
+}
+
+/* Aktif öğe: vurgunun şeffaf zemini, simge ve yazı vurgu renginde. */
+.cubuk .cubuk-ogesi[aria-current="page"] {
+    background: var(--vurgu-zemin);
+    color: var(--vurgu-yazi);
+}
+
+.cubuk-yazi {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Yoklama öğesindeki sayı rozeti (bekleyen oturum sayısı) */
+.cubuk-rozet {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--ton-tehlike);
+    color: #1a0606;
+    font-size: 11.5px;
+    font-weight: 700;
+    line-height: 20px;
+    text-align: center;
+}
+
+/* ---- Daralmış çubuk: sadece simgeler ---- */
+:root[data-cubuk="dar"] .cubuk {
+    overflow: visible;            /* sağda çıkan ipuçları kesilmesin */
+}
+
+:root[data-cubuk="dar"] .cubuk-yazi,
+:root[data-cubuk="dar"] .grup-basligi {
+    display: none;
+}
+
+:root[data-cubuk="dar"] .cubuk-baslik {
+    justify-content: center;
+    padding: 0;
+}
+
+/* Daralmışken başlıkta sadece marka simgesi görünür; üzerine gelince ya da klavyeyle
+   odaklanınca yerini genişlet düğmesi alır. */
+:root[data-cubuk="dar"] .cubuk .cubuk-daralt {
+    position: absolute;
+    inset: 0;
+    width: 44px;
+    height: 44px;
+    margin: auto;
+    opacity: 0;
+}
+
+:root[data-cubuk="dar"] .cubuk-daralt .simge {
+    transform: scaleX(-1);        /* ok sağa bakar: genişlet */
+}
+
+:root[data-cubuk="dar"] .cubuk-baslik:hover .cubuk-daralt,
+:root[data-cubuk="dar"] .cubuk .cubuk-daralt:focus-visible {
+    opacity: 1;
+    background: var(--yuzey-2);
+    color: var(--baslik-rengi);
+}
+
+:root[data-cubuk="dar"] .cubuk-baslik:hover .marka,
+:root[data-cubuk="dar"] .cubuk-baslik:focus-within .marka {
+    opacity: 0;
+}
+
+:root[data-cubuk="dar"] .cubuk .cubuk-ogesi,
+:root[data-cubuk="dar"] .cubuk .ders-ekle-dugmesi {
+    justify-content: center;
+    width: 44px;
+    padding: 0;
+}
+
+/* Daralmışken rozet simgenin sağ üstünde durur. */
+:root[data-cubuk="dar"] .cubuk-rozet {
+    position: absolute;
+    top: 3px;
+    right: 1px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    font-size: 10px;
+    line-height: 17px;
+}
+
+/* Daralmışken ipucu: öğenin sağında (fare üzerindeyken ve klavye odağında). */
+:root[data-cubuk="dar"] [data-ipucu]:hover::after,
+:root[data-cubuk="dar"] [data-ipucu]:focus-visible::after {
+    content: attr(data-ipucu);
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    z-index: 80;
+    padding: 5px 10px;
+    transform: translateY(-50%);
+    border: 1px solid var(--cerceve);
+    border-radius: 8px;
+    background: var(--yuzey-2);
+    color: var(--baslik-rengi);
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    box-shadow: var(--pencere-golgesi);
+    pointer-events: none;
+}
+
+/* ---------- Üst çubuk ---------- */
+
+.ust-cubuk {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    height: var(--ust-cubuk-yuksekligi);
+    padding: 0 24px;
+    border-bottom: 1px solid var(--cerceve);
+}
+
+.sayfa-basligi {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.ust-cubuk .bosluk {
+    flex: 1;
+}
+
+/* Üst çubuktaki küçük düğmeler: menü ve Panel. Sadece dar ekranda görünürler (en altta). */
+.ust-dugme {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--cerceve);
+    border-radius: 10px;
+    background: var(--yuzey);
+    color: var(--baslik-rengi);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+/* Kullanıcı alanı: avatar, ad ve dönem bilgisi. Tıklayınca Ayarlar > Profil açılır. */
+.kullanici-alani {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 8px 4px 4px;
+    border: 0;
+    border-radius: 12px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--gecis);
+}
+
+.kullanici-alani:hover {
+    background: var(--yuzey-2);
+}
+
+.avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--vurgu-zemin);
+    color: var(--vurgu-yazi);
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.kullanici-yazilari {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+}
+
+.kullanici-adi {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.donem-bilgisi {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: var(--soluk-yazi);
+    white-space: nowrap;
+}
+
+/* Dönem durumunu gösteren nokta: devam ediyorsa yeşil, tanımlı değilse sarı. */
+.durum-noktasi {
+    flex-shrink: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--soluk-yazi);
+}
+
+.durum-noktasi.yesil {
+    background: var(--ton-olumlu);
+}
+
+.durum-noktasi.sari {
+    background: var(--ton-uyari);
+}
+
+/* ---------- Karşılama satırı: selam + tarih, sağda hafta gezinme ---------- */
+
+.karsilama {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-shrink: 0;
+    min-height: 72px;
+    padding: 16px 24px;
+}
+
+.karsilama h2 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+}
+
+.karsilama p {
+    margin: 4px 0 0;
+    font-size: 14px;
+    color: var(--soluk-yazi);
+}
+
+/* Hafta gezinme: "‹ 28 Eyl – 4 Eki ›" grubu ve ayrı "Bugün" düğmesi. */
+.hafta-gezinme {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.hafta-grubu {
+    display: flex;
+    align-items: center;
+    height: 40px;
+    padding: 0 4px;
+    border: 1px solid var(--cerceve);
+    border-radius: 999px;
+    background: var(--yuzey);
+}
+
+.hafta-gezinme button {
+    height: 40px;
+    padding: 0 16px;
+    border: 1px solid var(--cerceve);
+    border-radius: 999px;
+    background: var(--yuzey);
+    color: var(--baslik-rengi);
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color var(--gecis), background var(--gecis);
+}
+
+.hafta-gezinme button:hover {
+    border-color: var(--cerceve-parlak);
+    background: var(--yuzey-2);
+}
+
+/* Grubun içindeki ok düğmeleri kenarlıksız ve yuvarlak. */
+.hafta-gezinme .hafta-grubu button {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    font-size: 17px;
+}
+
+.hafta-gezinme .hafta-grubu button:hover {
+    background: var(--yuzey-2);
+}
+
+.hafta-araligi {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+    font-size: 13.5px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.hafta-araligi .simge {
+    width: 17px;
+    height: 17px;
+    color: var(--soluk-yazi);
+}
+
+/* ---------- Takvim kartı (yaklaşık %75) ve sağ panel (yaklaşık %25) ---------- */
+
+.sayfa {
+    flex: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(300px, 25%, 440px);
+    gap: 16px;
+    min-height: 0;                /* kalan yüksekliği doldurur, taşmaz */
+    padding: 0 24px 24px;
 }
 
 .yan-panel {
@@ -159,11 +725,17 @@ body {
     flex-direction: column;
     min-width: 0;                 /* dar pencerede içerik paneli genişletmesin */
     min-height: 0;
-    overflow: hidden;
-    background: var(--panel-arka-plan);
+    overflow: hidden;             /* içerik kendi içinde (sekme içeriğinde) kayar */
     border: 1px solid var(--cerceve);
-    border-radius: 12px;
+    border-radius: var(--kart-kosesi);
+    background: var(--panel-arka-plan);
     font-size: 13px;
+    transition: border-color var(--gecis);
+}
+
+.yan-panel:hover,
+.takvim:hover {
+    border-color: var(--cerceve-parlak);
 }
 
 /* ============================================================
@@ -188,8 +760,8 @@ body {
 .ders-paneli {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 14px 14px 0;
+    gap: 12px;
+    padding: 16px 16px 0;
 }
 
 .panel-baslik {
@@ -233,12 +805,12 @@ body {
 .sekmeler {
     display: flex;
     flex-wrap: wrap;              /* dar panelde sığmayan sekme alt satıra geçer, taşmaz */
-    gap: 0 4px;
+    gap: 0 2px;
     border-bottom: 1px solid var(--cizgi);
 }
 
 .sekmeler button {
-    padding: 6px 8px;
+    padding: 6px 6px;
     border: 0;
     border-bottom: 2px solid transparent;
     background: none;
@@ -287,22 +859,28 @@ body {
 
 /* Sonuç kutusu. Varsayılan hali nötr (gri): hiç puan girilmemişse ya da kalem yoksa. */
 .hesap-sonucu {
-    padding: 12px;
+    padding: 14px 16px;
     border: 1px solid var(--cerceve);
-    border-radius: 10px;
+    border-radius: var(--ic-kose);
     background: var(--yuzey-2);
+    transition: border-color var(--gecis);
+}
+
+.hesap-sonucu:hover,
+.yoklama-karti:hover {
+    border-color: var(--cerceve-parlak);
 }
 
 /* Hedefe ulaşıldı: yeşil. Ulaşılmadı: sarı. */
 .hesap-sonucu.yesil {
     border-color: var(--sonuc-yesil-cerceve);
-    background: var(--sonuc-yesil-zemin);
+    background: linear-gradient(180deg, var(--sonuc-yesil-zemin), transparent 60%) var(--yuzey);
     color: var(--sonuc-yesil-yazi);
 }
 
 .hesap-sonucu.sari {
     border-color: var(--sonuc-sari-cerceve);
-    background: var(--sonuc-sari-zemin);
+    background: linear-gradient(180deg, var(--sonuc-sari-zemin), transparent 60%) var(--yuzey);
     color: var(--sonuc-sari-yazi);
 }
 
@@ -342,12 +920,12 @@ body {
 
 .hesap-sonucu.yesil .durum-simgesi {
     background: var(--sonuc-yesil-yazi);
-    color: var(--sonuc-yesil-zemin);
+    color: var(--yuzey);
 }
 
 .hesap-sonucu.sari .durum-simgesi {
     background: var(--sonuc-sari-yazi);
-    color: var(--sonuc-sari-zemin);
+    color: var(--yuzey);
 }
 
 /* Alt not satırları: nötr kutuda gri, sarı kutuda kutunun koyu sarı yazı renginde. */
@@ -424,13 +1002,15 @@ body {
 }
 
 /* "ekstra" etiketi */
+/* "ekstra" etiketi: hap rozet (bilgi tonu) */
 .ekstra-etiketi {
     margin-left: 6px;
-    padding: 1px 6px;
+    padding: 2px 8px;
     border-radius: 999px;
-    background: var(--vurgu-zemin);
-    color: var(--vurgu);
-    font-size: 10.5px;
+    background: var(--yuzey-2);
+    color: var(--ton-bilgi-yazi);
+    font-size: 11.5px;
+    font-weight: 500;
 }
 
 /* Sınav bloğundan gelindiğinde ilgili kalemin satırı kısa süre vurgulanır. */
@@ -506,58 +1086,18 @@ body {
     min-width: 0;                 /* dar pencerede sağ paneli itmesin */
 }
 
-/* Hafta gezinme satırı: takvim alanının en üstünde ince bir şerit. */
-.hafta-gezinme {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: var(--gezinme-yuksekligi);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.hafta-gezinme button {
-    height: 100%;
-    min-width: 28px;
-    padding: 0 10px;
-    border: 1px solid var(--cerceve);
-    border-radius: 8px;
-    background: var(--yuzey-2);
-    color: var(--baslik-rengi);
-    font: inherit;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.hafta-gezinme button:hover {
-    border-color: var(--vurgu);
-    color: var(--vurgu);
-}
-
-.hafta-yazisi {
-    margin-left: 6px;
-    font-size: 12px;
-    color: var(--soluk-yazi);
-}
-
 .takvim {
-    position: absolute;           /* gezinme satırının altında kalan alanın tamamını kapla */
-    inset: calc(var(--gezinme-yuksekligi) + var(--gezinme-boslugu)) 0 0 0;
+    position: absolute;           /* takvim alanının tamamını kapla */
+    inset: 0;
     overflow: auto;
     background: var(--yuzey);
     border: 1px solid var(--cerceve);
-    border-radius: 12px;
+    border-radius: var(--kart-kosesi);
+    transition: border-color var(--gecis);
 
     /* Bu satır sayesinde içerideki "cqw" ve "cqh" birimleri takvimin
        GÖRÜNEN genişliğinin ve yüksekliğinin yüzdesi anlamına gelir. */
     container-type: size;
-
-    /* Sade kaydırma çubukları */
-    scrollbar-width: thin;
-    scrollbar-color: var(--kaydirma-cubugu) transparent;
 }
 
 .izgara {
@@ -630,7 +1170,7 @@ body {
     padding: 3px 10px;
     border-radius: 999px;
     background: var(--vurgu-zemin);
-    color: var(--vurgu);
+    color: var(--vurgu-yazi);
 }
 
 /* ---------- Saatsiz sınav şeridi: gün başlıklarının hemen altında sabit durur ---------- */
@@ -881,31 +1421,33 @@ body {
     display: none !important;
 }
 
-/* Pencereler ekranın, alt çubuğun (dock) üstünde kalan kısmında ortalanır; çubuk açık pencerede
-   de görünür ve tıklanabilir kalır. Katman sırası (alttan üste): sayfa < perde < pencere <
-   üst perde < üstteki küçük pencere < dock. Açma/kapama static/dock.js'te (pencereyiAc). */
+/* Pencereler, sol çubuk HARİÇ alanın ortasında açılır; çubuk açık pencerede de görünür ve
+   tıklanabilir kalır. Katman sırası (alttan üste): içerik < perde < pencere < üst perde <
+   üstteki küçük pencere < sol çubuk. Açma/kapama static/kabuk.js'te (pencereyiAc). */
 .pencere {
     position: fixed;
-    inset: 16px 0 var(--dock-alani) 0;
+    inset: 16px 0 16px var(--cubuk-genisligi);
     z-index: 50;
     margin: auto;
-    width: min(700px, 94vw);
-    max-height: calc(100vh - var(--dock-alani) - 32px);
+    width: min(700px, calc(100vw - var(--cubuk-genisligi) - 32px));
+    max-height: calc(100vh - 32px);
     padding: 20px 24px;
     overflow: auto;
     border: 1px solid var(--cerceve);
-    border-radius: 14px;
+    border-radius: var(--kart-kosesi);
     background: var(--yuzey);
     color: var(--baslik-rengi);
     box-shadow: var(--pencere-golgesi);
 }
 
-/* Açık pencerenin arkasını karartan perde. Alt çubuğun ALTINDA kalır. */
+/* Açık pencerenin arkasını karartan, hafif bulanık perde. Sol çubuğu örtmez. */
 .perde {
     position: fixed;
-    inset: 0;
+    inset: 0 0 0 var(--cubuk-genisligi);
     z-index: 40;
     background: var(--perde);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
 }
 
 /* Bir pencerenin üstünde açılan küçük pencere (ör. "Akademik takvimden doldur") ve onun perdesi */
@@ -963,7 +1505,7 @@ body {
     gap: 4px;
     padding: 28px 16px 22px;
     border: 1px solid var(--cerceve);
-    border-radius: 12px;
+    border-radius: var(--ic-kose);
     background: var(--yuzey-2);
     color: var(--baslik-rengi);
     font: inherit;
@@ -1309,8 +1851,8 @@ body {
    Ekranın büyük kısmını kaplar; kenarlarda boşluk kalır.
    ============================================================ */
 .donem-penceresi {
-    width: 85vw;
-    height: min(85vh, calc(100vh - var(--dock-alani) - 32px));
+    width: min(1100px, calc((100vw - var(--cubuk-genisligi)) * 0.9));
+    height: min(85vh, calc(100vh - 32px));
     padding: 0;                   /* iç boşluğu .donem-icerigi verir */
 }
 
@@ -1427,11 +1969,12 @@ body {
 .satir-uyarisi {
     display: inline-block;
     margin-left: 8px;
-    padding: 1px 7px;
+    padding: 2px 8px;
     border-radius: 999px;
-    background: var(--uyari-zemin);
+    background: var(--yuzey-2);
     color: var(--uyari-yazi);
-    font-size: 11px;
+    font-size: 11.5px;
+    font-weight: 500;
 }
 
 /* Simülasyonda harfi değiştirilmiş satırın işareti: küçük nokta */
@@ -1513,7 +2056,7 @@ body {
 /* ---------- Yoklama penceresi ---------- */
 
 .yoklama-penceresi {
-    width: min(760px, 94vw);
+    width: min(760px, calc(100vw - var(--cubuk-genisligi) - 32px));
 }
 
 .yoklama-listesi {
@@ -1589,10 +2132,11 @@ body {
 /* ---------- Sağ panel: Devamsızlık sekmesi ---------- */
 
 .yoklama-karti {
-    padding: 12px;
+    padding: 14px 16px;
     border: 1px solid var(--cerceve);
-    border-radius: 10px;
+    border-radius: var(--ic-kose);
     background: var(--yuzey-2);
+    transition: border-color var(--gecis);
 }
 
 .yoklama-karti h3 {
@@ -1636,26 +2180,26 @@ body {
 /* Sınır bölümü: ilerleme çubuğu ve "Kullanılan X / Y". Rengi duruma göre. */
 .sinir-durumu {
     margin-top: 10px;
-    padding: 8px 10px;
+    padding: 10px 12px;
     border: 1px solid var(--cerceve);
-    border-radius: 8px;
+    border-radius: 12px;
 }
 
 .sinir-durumu.yesil {
     border-color: var(--sonuc-yesil-cerceve);
-    background: var(--sonuc-yesil-zemin);
+    background: linear-gradient(180deg, var(--sonuc-yesil-zemin), transparent 60%) var(--yuzey);
     color: var(--sonuc-yesil-yazi);
 }
 
 .sinir-durumu.sari {
     border-color: var(--sonuc-sari-cerceve);
-    background: var(--sonuc-sari-zemin);
+    background: linear-gradient(180deg, var(--sonuc-sari-zemin), transparent 60%) var(--yuzey);
     color: var(--sonuc-sari-yazi);
 }
 
 .sinir-durumu.kirmizi {
     border-color: var(--sonuc-kirmizi-cerceve);
-    background: var(--sonuc-kirmizi-zemin);
+    background: linear-gradient(180deg, var(--sonuc-kirmizi-zemin), transparent 60%) var(--yuzey);
     color: var(--sonuc-kirmizi-yazi);
 }
 
@@ -1755,7 +2299,7 @@ body {
 }
 
 .takvim-doldur-penceresi {
-    width: min(560px, 94vw);
+    width: min(560px, calc(100vw - var(--cubuk-genisligi) - 32px));
 }
 
 .takvim-doldur-icerigi {
@@ -1770,134 +2314,10 @@ body {
 
 
 /* ============================================================
-   ALT ÇUBUK (DOCK): ekranın altında, ortada yüzen gezinme çubuğu
-   Tuşlar: Takvim, Yoklama, Ders ekle, Dönem, Ayarlar (static/dock.js).
-   ============================================================ */
-.dock {
-    position: fixed;
-    left: 50%;
-    bottom: var(--dock-alt-bosluk);
-    z-index: 60;                  /* perdenin ve pencerelerin üstünde */
-    display: flex;
-    height: var(--dock-yuksekligi);
-    padding: 0 10px;
-    transform: translateX(-50%);
-    border: 1px solid var(--dock-cerceve);
-    border-radius: 16px;
-    background: var(--dock-zemin);
-    box-shadow: var(--dock-golgesi);
-}
-
-.dock button {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--dock-tusu);
-    height: 100%;
-    padding: 0;
-    border: 0;
-    border-radius: 12px;
-    background: none;
-    color: var(--dock-simge);
-    cursor: pointer;
-    transition: color 0.15s ease;
-}
-
-.dock svg {
-    width: 23px;
-    height: 23px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.6;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-.dock button:hover,
-.dock button[aria-current="page"] {
-    color: var(--dock-simge-aktif);
-}
-
-.dock button:focus-visible {
-    outline: 2px solid var(--vurgu);
-    outline-offset: -6px;
-}
-
-/* Aktif tuşun işareti: üst kenara oturan parlak çizgi ve altından tuşun dibine doğru sönen ışık.
-   Tek bir parça; aktif tuş değişince yatayda kayar (--aktif-sira: 0, 1, 2 ...). */
-.dock-isik {
-    position: absolute;
-    top: 0;
-    left: 10px;
-    width: var(--dock-tusu);
-    height: 100%;
-    pointer-events: none;
-    transform: translateX(calc(var(--aktif-sira, 0) * var(--dock-tusu)));
-    transition: transform 0.2s ease;
-}
-
-/* Çizgi: çubuğun üst kenarına oturur. */
-.dock-isik::before {
-    content: "";
-    position: absolute;
-    top: -2px;
-    left: calc(50% - 16px);
-    width: 32px;
-    height: 3px;
-    border-radius: 3px;
-    background: var(--dock-simge-aktif);
-}
-
-/* Işık hüzmesi: çizgiden aşağı doğru genişleyip sönen koni. */
-.dock-isik::after {
-    content: "";
-    position: absolute;
-    inset: 1px 2px 0;
-    background: linear-gradient(to bottom, var(--dock-isik), transparent 92%);
-    clip-path: polygon(24% 0, 76% 0, 100% 100%, 0 100%);
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .dock-isik,
-    .dock button {
-        transition: none;
-    }
-}
-
-/* Yoklama tuşundaki sayı rozeti (bekleyen oturum sayısı) */
-.dock-rozet {
-    position: absolute;
-    top: 9px;
-    left: calc(50% + 4px);
-    min-width: 16px;
-    height: 16px;
-    padding: 0 4px;
-    border-radius: 999px;
-    background: var(--hata);
-    color: var(--dolgu-yazi);
-    font-size: 10px;
-    font-weight: 700;
-    line-height: 16px;
-    text-align: center;
-}
-
-:root[data-tema="acik"] .dock-rozet {
-    color: #ffffff;
-}
-
-/* Küçük ekranda tuşlar çubuğa sığacak kadar daralır. */
-@media (max-width: 480px) {
-    :root {
-        --dock-tusu: min(56px, calc((100vw - 54px) / 5));
-    }
-}
-
-/* ============================================================
    AYARLAR PENCERESİ (bölümlü: şimdilik sadece "Tema")
    ============================================================ */
 .ayarlar-penceresi {
-    width: min(420px, 94vw);
+    width: min(460px, calc(100vw - var(--cubuk-genisligi) - 32px));
     font-size: 13px;
 }
 
@@ -1946,5 +2366,151 @@ body {
 
 .ayar-bolumu .kucuk-not {
     margin-top: 8px;
+}
+
+/* Ayarlar > Profil: ad alanı ve Kaydet yan yana */
+.profil-satiri {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.profil-satiri input {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ============================================================
+   DAR EKRAN
+   < 1100px : sağ panel sütunu gizlenir, üst çubuktaki "Panel" düğmesiyle sağdan çekmece olur.
+   <  900px : sol çubuk gizlenir, üst çubuktaki menü düğmesiyle soldan çekmece olur.
+   Çekmecelerin açık olduğunu <html data-panel="acik"> ve <html data-cekmece="acik"> belirtir.
+   ============================================================ */
+
+/* Çekmecelerin arkasındaki perde (pencere perdesinden ayrı). */
+.cekmece-perdesi {
+    position: fixed;
+    inset: 0;
+    z-index: 64;
+    background: var(--perde);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+}
+
+@media (max-width: 1099px) {
+    .sayfa {
+        grid-template-columns: minmax(0, 1fr);   /* takvim tam genişliği kullanır */
+    }
+
+    .ust-dugme.panel-dugmesi {
+        display: inline-flex;
+    }
+
+    .yan-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 66;
+        width: min(400px, 92vw);
+        border-radius: var(--kart-kosesi) 0 0 var(--kart-kosesi);
+        transform: translateX(105%);
+        visibility: hidden;
+        transition: transform var(--gecis), visibility var(--gecis);
+    }
+
+    :root[data-panel="acik"] .yan-panel {
+        transform: none;
+        visibility: visible;
+        box-shadow: var(--pencere-golgesi);
+    }
+}
+
+@media (max-width: 899px) {
+    :root,
+    :root[data-cubuk="dar"] {
+        --cubuk-genisligi: 0px;   /* çubuk yer kaplamaz: pencereler ve perde tüm genişliği kullanır */
+    }
+
+    .ust-dugme.menu-acici {
+        display: inline-flex;
+    }
+
+    .kabuk {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* Çubuk çekmece olur: hep açık genişlikte, ekranın solundan kayarak gelir. */
+    .cubuk {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: var(--cubuk-acik);
+        overflow-y: auto;
+        transform: translateX(-105%);
+        visibility: hidden;
+        transition: transform var(--gecis), visibility var(--gecis);
+    }
+
+    :root[data-cekmece="acik"] .cubuk {
+        transform: none;
+        visibility: visible;
+        box-shadow: var(--pencere-golgesi);
+    }
+
+    /* Bu modda daralma yok: daralt düğmesi gizli, yazılar hep görünür. */
+    .cubuk .cubuk-daralt {
+        display: none;
+    }
+
+    :root[data-cubuk="dar"] .cubuk-yazi {
+        display: block;
+    }
+
+    :root[data-cubuk="dar"] .grup-basligi {
+        display: block;
+    }
+
+    :root[data-cubuk="dar"] .cubuk-baslik {
+        justify-content: space-between;
+        padding: 0 12px 0 20px;
+    }
+
+    :root[data-cubuk="dar"] .cubuk .cubuk-ogesi,
+    :root[data-cubuk="dar"] .cubuk .ders-ekle-dugmesi {
+        width: 100%;
+        padding: 0 12px;
+    }
+
+    :root[data-cubuk="dar"] .cubuk .cubuk-ogesi {
+        justify-content: flex-start;
+    }
+
+    :root[data-cubuk="dar"] .cubuk-rozet {
+        position: static;
+    }
+
+    :root[data-cubuk="dar"] [data-ipucu]::after {
+        display: none;
+    }
+
+    .karsilama {
+        flex-wrap: wrap;
+    }
+
+    .karsilama h2 {
+        font-size: 24px;
+    }
+
+    .ust-cubuk,
+    .karsilama {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .sayfa {
+        padding: 0 16px 16px;
+    }
 }
 

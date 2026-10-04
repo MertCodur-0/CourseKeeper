@@ -41,8 +41,8 @@ const simulasyonKutusu = document.getElementById("simulasyon");
 // ============================================================
 
 // Pencereyi açar: dönemi ve GPA ayarlarını sunucudan alıp formları doldurur.
-// Ders eklenmemişken de açılır.
-async function donemEkraniniAc() {
+// Ders eklenmemişken de açılır. sekme: açılışta gösterilecek sekme ("takvim" ya da "gpa").
+async function donemEkraniniAc(sekme = "takvim") {
     let donemVerisi;
     let gpaAyarlari;
     try {
@@ -57,13 +57,13 @@ async function donemEkraniniAc() {
     donemFormunuDoldur(donemVerisi);
     gpaAlanlariniDoldur(gpaAyarlari);
     simulasyon = {};
-    donemSekmesiniGoster("takvim");
+    donemSekmesiniGoster(sekme);
     pencereyiAc(donemPenceresi);
     gpaCiz();
 }
 
 // Kapatmadan önce: akademik takvimde kaydedilmemiş değişiklik varsa onay ister.
-// Pencere kapandıysa true, kullanıcı vazgeçtiyse false döner (alt çubuk buna göre davranır).
+// Pencere kapandıysa true, kullanıcı vazgeçtiyse false döner (sol çubuk buna göre davranır).
 function donemEkraniniKapat() {
     const degisti = JSON.stringify(donemFormunuOku()) !== donemAnlik;
     if (degisti && !confirm("Akademik takvimde kaydedilmemiş değişiklikler var. Yine de kapatılsın mı?")) return false;
@@ -79,6 +79,8 @@ function donemSekmesiniGoster(ad) {
         sekme.hidden = sekme.dataset.sekme !== ad;
     });
     if (ad === "gpa") gpaCiz();
+    // Sol çubukta "Akademik takvim" ve "GPA" ayrı öğelerdir: aktif öğe açık sekmeye göre değişir.
+    pencereDurumunuGuncelle();
 }
 
 // ============================================================
@@ -696,7 +698,7 @@ async function simulasyonuKaydet() {
 // OLAYLAR
 // ============================================================
 
-// Pencere alt çubuktaki "Dönem" tuşuyla açılır. Esc ve dışına tıklama static/dock.js'te ele alınır;
+// Pencere sol çubuktaki "Akademik takvim" ve "GPA" öğeleriyle açılır. Esc ve dışına tıklama static/kabuk.js'te ele alınır;
 // ikisi de donemEkraniniKapat'ı çağırır (kaydedilmemiş değişiklik varsa onay sorulur).
 document.getElementById("donem-kapat").addEventListener("click", donemEkraniniKapat);
 // Pencere kapanınca simülasyon sıfırlanır.
