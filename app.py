@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import shutil
@@ -9,6 +10,7 @@ from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
 import akademik_takvim
+import hava
 import syllabus
 from syllabus import SyllabusHatasi
 
@@ -1177,6 +1179,59 @@ def api_ozet():
     sonuc["gpa"] = gpa_ayarlarini_getir(baglanti)
     baglanti.close()
     return jsonify(sonuc)
+
+
+# ---------- Hava durumu (Open-Meteo) ----------
+
+class KonumGizleyici(logging.Filter):
+    """Sunucu günlüğünde hava/şehir isteklerinin "?" sonrası kısmını (koordinat, aranan şehir) gizler."""
+
+    def filter(self, kayit):
+        kayit.msg = re.sub(r"(/api/(?:hava|sehir-ara))\?\S*", r"\1?…", str(kayit.msg))
+        if kayit.args:
+            kayit.args = tuple(
+                re.sub(r"(/api/(?:hava|sehir-ara))\?\S*", r"\1?…", parca) if isinstance(parca, str) else parca
+                for parca in kayit.args
+            )
+        return True
+
+
+logging.getLogger("werkzeug").addFilter(KonumGizleyici())
+
+@app.route("/api/hava", methods=["GET"])
+def api_hava():
+    """Verilen koordinatın hava durumunu döndürür (salt okunur; ayrıntılar hava.py'de).
+
+    Koordinatlar tarayıcıda saklanan şehirden gelir. Sunucu sadece sabit Open-Meteo adresine
+    istek atar; hata mesajlarına ve kayıtlara koordinat yazılmaz.
+    """
+    try:
+        enlem = float(request.args.get("lat", ""))
+        boylam = float(request.args.get("lon", ""))
+    except ValueError:
+        return jsonify({"hata": "Konum geçersiz. Ayarlar > Konum'dan şehri yeniden seç."}), 400
+    # nan ve sonsuz değerler de bu karşılaştırmadan geçemez.
+    if not (-90 <= enlem <= 90 and -180 <= boylam <= 180):
+        return jsonify({"hata": "Konum geçersiz. Ayarlar > Konum'dan şehri yeniden seç."}), 400
+    try:
+        return jsonify(hava.hava_getir(enlem, boylam))
+    except hava.HavaHatasi as hata:
+        return jsonify({"hata": str(hata)}), 503
+    except Exception as hata:
+        app.logger.error("Hava durumu alınırken beklenmeyen hata: %s", type(hata).__name__)
+        return jsonify({"hata": "Hava durumu alınamadı."}), 500
+
+
+@app.route("/api/sehir-ara", methods=["GET"])
+def api_sehir_ara():
+    """Ayarlar > Konum'daki şehir araması: {"sehirler": [{ad, bolge, ulke, enlem, boylam}]}."""
+    try:
+        return jsonify({"sehirler": hava.sehir_ara(metin(request.args.get("q")))})
+    except hava.HavaHatasi as hata:
+        return jsonify({"hata": str(hata)}), 503
+    except Exception as hata:
+        app.logger.error("Şehir aranırken beklenmeyen hata: %s", type(hata).__name__)
+        return jsonify({"hata": "Şehir aranamadı."}), 500
 
 
 # ---------- Arama ----------

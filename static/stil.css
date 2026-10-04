@@ -2564,17 +2564,6 @@ body {
 .simge-karesi.kare-mavi { background: var(--kare-mavi); }
 .simge-karesi.kare-turkuaz { background: var(--kare-turkuaz); }
 
-.simge-karesi.kucuk {
-    width: 28px;
-    height: 28px;
-    border-radius: 9px;
-}
-
-.simge-karesi.kucuk .simge {
-    width: 16px;
-    height: 16px;
-}
-
 /* Hap rozetin ton halleri */
 .hap {
     flex-shrink: 0;
@@ -2695,77 +2684,6 @@ body {
 .madde-isareti.tehlike { color: var(--ton-tehlike-yazi); }
 .madde-isareti.bilgi { color: var(--ton-bilgi-yazi); }
 .madde-isareti.olumlu { color: var(--ton-olumlu-yazi); }
-
-/* ---------- Mini rakam kartları (2×2; panel darsa tek sütun) ---------- */
-
-.mini-kartlar {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 12px;
-}
-
-.mini-kart {
-    padding: 12px;
-    border: 1px solid var(--cerceve);
-    border-radius: var(--ic-kose);
-    background: var(--yuzey-2);
-    transition: border-color var(--gecis);
-}
-
-.mini-kart:hover {
-    border-color: var(--cerceve-parlak);
-}
-
-.mini-baslik {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--soluk-yazi);
-}
-
-.mini-deger {
-    display: flex;
-    align-items: baseline;
-    gap: 5px;
-    margin-top: 10px;
-}
-
-.mini-deger strong {
-    font-size: 26px;
-    font-weight: 600;
-    line-height: 1.1;
-}
-
-.mini-deger small {
-    font-size: 13px;
-    color: var(--soluk-yazi);
-}
-
-.mini-kart p {
-    margin: 4px 0 0;
-    font-size: 12px;
-    color: var(--soluk-yazi);
-}
-
-/* GPA kartındaki büyük değer */
-.buyuk-deger {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    padding: 2px 4px 6px;
-    border-radius: 8px;
-}
-
-.buyuk-deger strong {
-    font-size: 30px;
-    font-weight: 600;
-    line-height: 1.1;
-}
-
-.buyuk-deger small {
-    color: var(--soluk-yazi);
-}
 
 /* ---------- Dönem ilerlemesi: solda halka, sağda satırlar ---------- */
 
@@ -3110,3 +3028,186 @@ kbd {
 .yardim-listesi li + li {
     margin-top: 4px;
 }
+
+/* ============================================================
+   GENEL BAKIŞ: "Sonraki sınav" ve "Hava durumu" kartlarının ekleri
+   (Kart, simge karesi, hap rozet, halka ve etiket-değer satırları "Dönem ilerlemesi" ile ortaktır;
+   aşağıdakiler sadece bu iki karta özgü eklerdir, ortak kurallar değişmedi.)
+   ============================================================ */
+
+/* Ek tonlar: amber (sınava 4-7 gün) ve gök mavisi (hava durumu) */
+.ton-uyari { --ton-rgb: 250, 204, 21; --ton-yazi: var(--ton-uyari-yazi); }
+.ton-gok { --ton-rgb: 56, 189, 248; --ton-yazi: var(--ton-gok-yazi); }
+
+:root {
+    --kare-gok: #38bdf8;          /* hava durumu simge karesi */
+    --ton-gok-yazi: #0369a1;      /* gök mavisi tonun açık temada okunur yazı rengi */
+}
+
+:root[data-tema="koyu"] {
+    --ton-gok-yazi: #38bdf8;
+}
+
+.simge-karesi.kare-gok { background: var(--kare-gok); }
+.hap.gok { color: var(--ton-gok-yazi); }
+
+/* Sonraki sınav: halkanın dolgusu kartın tonunda (mor / amber / kırmızı). */
+.tonlu-halka .halka-dolu {
+    stroke: rgb(var(--ton-rgb));
+}
+
+/* Halkanın ortasında iki satır: büyük kalan gün ve altında küçük "gün". */
+.ilerleme-halkasi strong.iki-satir {
+    flex-direction: column;
+    gap: 0;
+    font-size: 22px;
+    line-height: 1;
+}
+
+.ilerleme-halkasi strong.iki-satir small {
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--soluk-yazi);
+}
+
+.halka-satirlari > strong {
+    display: block;
+}
+
+.halka-satirlari > .kucuk-not {
+    margin-top: 4px;
+}
+
+.ozet-govdesi > .kucuk-not {
+    padding: 0 4px;
+}
+
+/* Kart başlığının altındaki soluk küçük satır (hava durumunda şehir adı) */
+.ozet-basligi h3 small {
+    display: block;
+    margin-top: 1px;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--soluk-yazi);
+}
+
+/* ---------- Hava durumu ---------- */
+
+/* Büyük sıcaklık ve yanında durum yazısı */
+.hava-ust {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 0 4px;
+}
+
+.hava-ust strong {
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1.05;
+}
+
+.hava-ust span {
+    color: var(--soluk-yazi);
+}
+
+/* 2×2 küçük iç kutucuklar: etiket solda, değer sağda */
+.hava-kutulari {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.hava-kutusu {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: var(--yuzey-2);
+}
+
+.hava-kutusu span {
+    font-size: 11.5px;
+    color: var(--soluk-yazi);
+}
+
+.hava-kutusu strong {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* 3 günlük mini şerit: gün adı, simge, en yüksek / en düşük */
+.hava-seridi {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.hava-gunu {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 4px;
+    border-radius: 10px;
+    background: var(--yuzey-2);
+    font-size: 12px;
+}
+
+.hava-gunu .simge {
+    width: 18px;
+    height: 18px;
+    color: var(--ton-gok-yazi);
+}
+
+.hava-gunu small {
+    color: var(--soluk-yazi);
+    white-space: nowrap;
+}
+
+.hava-kaynagi {
+    margin: 0;
+    text-align: right;
+    font-size: 10.5px;
+    color: var(--soluk-yazi);
+    opacity: 0.8;
+}
+
+/* Yüklenirken iskelet: hafifçe yanıp sönen gri çubuklar */
+.hava-iskeleti {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.iskelet {
+    display: block;
+    height: 34px;
+    border-radius: 10px;
+    background: var(--yuzey-2);
+    animation: iskelet-nabzi 1.2s ease-in-out infinite alternate;
+}
+
+.iskelet.buyuk {
+    width: 45%;
+    height: 30px;
+}
+
+@keyframes iskelet-nabzi {
+    from { opacity: 0.45; }
+    to { opacity: 1; }
+}
+
+/* Ayarlar > Konum: şehir arama sonuçları */
+.sehir-sonuclari {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sehir-sonuclari:empty {
+    display: none;
+}
+

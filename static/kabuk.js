@@ -89,7 +89,7 @@ const donemPenceresiEl = document.getElementById("donem-penceresi");
 const ayarlarPenceresi = document.getElementById("ayarlar-penceresi");
 const yardimPenceresi = document.getElementById("yardim-penceresi");
 const ANA_PENCERELER = [yoklamaPenceresiEl, dersPenceresiEl, donemPenceresiEl, ayarlarPenceresi, yardimPenceresi];
-let ayarlarBolumu = "ayarlar";   // Ayarlar penceresi hangi öğeden açıldı: "ayarlar" ya da "profil"
+let ayarlarBolumu = "ayarlar";   // Ayarlar penceresi hangi bölümde açıldı: "ayarlar", "konum" ya da "profil"
 
 // O an açık olan ana pencere (yoksa null).
 function acikAnaPencere() {
@@ -107,7 +107,7 @@ function aktifOge() {
     const acik = acikAnaPencere();
     if (acik === yoklamaPenceresiEl) return "yoklama";
     if (acik === dersPenceresiEl) return "ders";
-    if (acik === ayarlarPenceresi) return ayarlarBolumu;
+    if (acik === ayarlarPenceresi) return ayarlarBolumu === "profil" ? "profil" : "ayarlar";
     if (acik === yardimPenceresi) return "yardim";
     if (acik === donemPenceresiEl) {
         return document.querySelector("#donem-sekmeleri .secili")?.dataset.sekme === "gpa" ? "gpa" : "akademik";
@@ -170,15 +170,16 @@ function kullaniciAdi() {
     return (tercihOku(AD_TERCIHI) || "").trim().slice(0, 30);
 }
 
-// Ayarlar penceresini açar. bolum "profil" ise ad alanına odaklanır.
+// Ayarlar penceresini açar. bolum "profil" ise ad alanına, "konum" ise şehir kutusuna odaklanır.
 function ayarlarPenceresiniAc(bolum) {
     ayarlarBolumu = bolum;
     profilAdi.value = kullaniciAdi();
     document.getElementById("profil-durumu").textContent = "";
+    konumBolumunuCiz();
     pencereyiAc(ayarlarPenceresi);
-    if (bolum === "profil") {
-        document.getElementById("ayar-profil").scrollIntoView?.({ block: "nearest" });
-        profilAdi.focus();
+    if (bolum === "profil" || bolum === "konum") {
+        document.getElementById(`ayar-${bolum}`).scrollIntoView?.({ block: "nearest" });
+        (bolum === "profil" ? profilAdi : document.getElementById("sehir-kutusu")).focus();
     }
 }
 
@@ -209,6 +210,7 @@ const OGE_EYLEMLERI = {
     gpa: () => donemEkraniniAc("gpa"),
     ayarlar: () => ayarlarPenceresiniAc("ayarlar"),
     profil: () => ayarlarPenceresiniAc("profil"),
+    konum: () => ayarlarPenceresiniAc("konum"),   // sol çubukta öğesi yok; hava durumu kartı açar
     yardim: () => pencereyiAc(yardimPenceresi),
 };
 

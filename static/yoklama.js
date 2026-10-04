@@ -214,10 +214,8 @@ function yoklamaDurumunuGuncelle() {
 async function bekleyenleriYenile() {
     try {
         // Özetin tamamı alınır; dersler değiştirilmez (o sırada panelde yazılıyor olabilir),
-        // sadece zamana bağlı veriler (şimdi, dönem, yoklama, GPA ayarları) tazelenir.
-        const ozet = await istekGonder("GET", "/api/ozet");
-        gpaAyarlari = ozet.gpa;
-        yoklamaVerisiniAl(ozet);
+        // sadece zamana bağlı veriler (şimdi, dönem, yoklama) tazelenir.
+        yoklamaVerisiniAl(await istekGonder("GET", "/api/ozet"));
     } catch {
         return;   // sunucu kapalıysa sessizce geç; bir sonraki denemede düzelir
     }

@@ -1,12 +1,10 @@
 // Sağ paneldeki "Genel bakış" (ders seçili değilken görünen kartlar) ve zildeki bildirimler.
 //
-// Buradaki her şey KAYITLI VERİDEN türetilir; uydurma veri yoktur. Veri /api/ozet'ten gelir
-// (dersler, dönem, yoklama, GPA ayarları) ve hesaplar için mevcut fonksiyonlar kullanılır,
-// burada yeniden yazılmaz:
-//   not hesabı   : notDurumunuHesapla, sonucMesaji, harfSeviyesi, hedefHarf   (uygulama.js)
-//   devamsızlık  : dersYoklamasi, bekleyenYoklamalar, oturumPlanliMi ...      (yoklama.js)
-//   GPA          : gpaHesapla, gpaYaz                                         (donem.js)
-// uygulama.js, donem.js ve yoklama.js'ten sonra yüklenir.
+// Genel bakışta yalnızca üç kart vardır: Sonraki sınav, Dönem ilerlemesi ve Hava durumu
+// (hava durumu kartı static/hava.js'te). Aynı bilgi ikinci bir kartta tekrar gösterilmez.
+// Buradaki her şey KAYITLI VERİDEN türetilir; uydurma veri yoktur. Veri /api/ozet'ten gelir;
+// devamsızlık ve yoklama hesapları için mevcut fonksiyonlar kullanılır (dersYoklamasi,
+// bekleyenYoklamalar; yoklama.js). uygulama.js, donem.js ve yoklama.js'ten sonra yüklenir.
 
 const genelBakis = document.getElementById("genel-bakis");
 const zil = document.getElementById("zil");
@@ -16,17 +14,8 @@ let genelBakisKaydirmasi = 0;                          // ders paneline geçerke
 
 // Kartlarda kullanılan çizgi simgeler (satır içi SVG yolları).
 const OZET_SIMGELERI = {
-    takvim: '<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/>',
-    onay: '<circle cx="12" cy="12" r="8.5"/><path d="m8.3 12.3 2.5 2.5 4.9-5.3"/>',
-    saat: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
-    sapka: '<path d="M2.5 9.5 12 5l9.5 4.5L12 14z"/><path d="M6.5 11.5V16c0 1.4 2.5 2.6 5.5 2.6s5.5-1.2 5.5-2.6v-4.5"/><path d="M21.5 9.5v4.6"/>',
-    gunes: '<circle cx="12" cy="12" r="3.8"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/>',
-    bayrak: '<path d="M5.5 21V4"/><path d="M5.5 5h11l-2 3.5 2 3.5h-11"/>',
-    liste: '<path d="m3.5 6.5 1.6 1.6L8 5.2"/><path d="m3.5 12.5 1.6 1.6L8 11.2"/><path d="M4 18.5h3.5"/><path d="M11.5 6.5H20.5M11.5 12.5H20.5M11.5 18.5H20.5"/>',
     kalem: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
-    cizgi: '<path d="m3.5 17 6-6 4 4 7-7.5"/><path d="M15 7.5h5.5V13"/>',
     halka: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5"/>',
-    kivilcim: '<path d="M12 3.5 13.8 9l5.7 1.8-5.7 1.9L12 18.5l-1.8-5.8L4.5 10.8 10.2 9z"/><path d="M19 16.5v3M17.5 18h3"/>',
 };
 
 function ozetSimgesi(ad) {
@@ -129,52 +118,22 @@ function dersKaresi(ders) {
 // TÜRETİLMİŞ VERİLER (hepsi kayıtlı veriden; hesaplar mevcut fonksiyonlarla)
 // ============================================================
 
-// Gösterilen haftadaki ders saati ve oturum sayısı. Dönem tanımlıysa sadece planlanan dersler
-// (tatiller hariç) sayılır; iptal edilenler her durumda dışarıda kalır.
-function haftaOzeti() {
-    let saat = 0;
-    let oturumSayisi = 0;
-    gosterilenHafta().forEach((gun, sira) => {
-        const tarih = tarihYazisi(gun);
-        for (const ders of dersler) {
-            for (const oturum of ders.oturumlar) {
-                if (oturum.gun !== sira) continue;
-                if (yoklamaVerisi.donem && !oturumPlanliMi(oturum, tarih)) continue;
-                if (yoklamaDurumu(oturum.id, tarih) === "iptal") continue;
-                saat += saatiSayiyaCevir(oturum.bitis) - saatiSayiyaCevir(oturum.baslangic);
-                oturumSayisi += 1;
-            }
-        }
-    });
-    return { saat, oturumSayisi };
-}
-
-// Bütün derslerdeki katılım: gidilen ve gidilmeyen toplamı (devamsızlık hesabındaki havuzlardan).
-function katilimOzeti() {
-    let gidilen = 0;
-    let gidilmeyen = 0;
-    if (yoklamaVerisi.donem) {
-        for (const ders of dersler) {
-            for (const havuz of dersYoklamasi(ders)) {
-                gidilen += havuz.gidilen;
-                gidilmeyen += havuz.gidilmeyen;
-            }
-        }
-    }
-    const sayilan = gidilen + gidilmeyen;
-    return { gidilen, gidilmeyen, yuzde: sayilan > 0 ? gidilen / sayilan * 100 : null };
-}
-
-// Bugün ve sonrasındaki tarihli sınav/kalemler, en yakından uzağa: [{ders, kalem, gun}]
+// Yaklaşan tarihli sınav/kalemler, en yakından uzağa: [{ders, kalem, gun}].
+// Bugün dahildir; saati olan bugünkü kalem, saati geçtiyse sayılmaz. Tarihi geçmişler sayılmaz.
+// Aynı günde saati erken olan öne gelir; saatsizler o günün sonuna.
 function yaklasanKalemler() {
+    const simdikiSaat = yoklamaVerisi.simdi.slice(11, 16);
     const liste = [];
     for (const ders of dersler) {
         for (const kalem of ders.degerlendirmeler) {
-            if (kalem.tarih && gunFarki(kalem.tarih) >= 0) liste.push({ ders, kalem, gun: gunFarki(kalem.tarih) });
+            if (!kalem.tarih) continue;
+            const gun = gunFarki(kalem.tarih);
+            if (gun < 0 || (gun === 0 && kalem.saat && kalem.saat < simdikiSaat)) continue;
+            liste.push({ ders, kalem, gun });
         }
     }
     return liste.sort((a, b) => a.kalem.tarih.localeCompare(b.kalem.tarih)
-        || (a.kalem.saat || "").localeCompare(b.kalem.saat || ""));
+        || (a.kalem.saat || "99:99").localeCompare(b.kalem.saat || "99:99"));
 }
 
 // Dönemin durumu (dönem tanımlı değilse null).
@@ -200,30 +159,6 @@ function donemDurumu() {
     };
 }
 
-// Bugünün oturumları, saat sırasıyla; her biri o anki durumuyla.
-function bugunkuOturumlar() {
-    const bugun = bugunTarihi();
-    const simdi = yoklamaVerisi.simdi;
-    const gun = haftaninGunu(bugun);
-    const liste = [];
-    for (const ders of dersler) {
-        for (const oturum of ders.oturumlar) {
-            if (oturum.gun !== gun) continue;
-            const planli = oturumPlanliMi(oturum, bugun);
-            if (yoklamaVerisi.donem && !planli) continue;   // tatil ya da dönem dışı
-            const kayit = yoklamaDurumu(oturum.id, bugun);
-            let durum;
-            if (kayit === "iptal") durum = ["İptal", "soluk"];
-            else if (`${bugun}T${oturum.baslangic}` > simdi) durum = ["Sırada", "vurgu"];
-            else if (`${bugun}T${oturum.bitis}` > simdi) durum = ["● Devam ediyor", "olumlu"];
-            else if (planli && !kayit) durum = ["Yoklama bekliyor", "uyari"];
-            else durum = ["Bitti", "soluk"];
-            liste.push({ ders, oturum, durum });
-        }
-    }
-    return liste.sort((a, b) => a.oturum.baslangic.localeCompare(b.oturum.baslangic));
-}
-
 // Devamsızlık satırları: her ders (lab ayrıysa her havuz) için kullanılan / limit ve durum.
 // Genel durum en kötü satıra göredir: "asildi" > "dikkat" > "guvende".
 function devamsizlikOzeti() {
@@ -243,31 +178,30 @@ function devamsizlikOzeti() {
     return { satirlar, genel };
 }
 
-// Bildirimlerin ve "Önerilen işler"in ortak kaynağı: o anki gerçek durumdan çıkan maddeler.
-//   anahtar   : maddeyi tanıtan kısa yazı (bildirim kümesinin özeti bundan üretilir)
-//   bildirim  : zilde gösterilir      oneri : "Önerilen işler"de gösterilir
+// Bildirimlerin kaynağı: o anki gerçek durumdan çıkan maddeler.
+//   anahtar : maddeyi tanıtan kısa yazı (bildirim kümesinin özeti bundan üretilir)
 function durumMaddeleri() {
     const maddeler = [];
     const bekleyen = bekleyenYoklamalar().length;
     if (bekleyen > 0) {
         maddeler.push({
-            anahtar: `yoklama:${bekleyen}`, ton: "uyari", isaret: "!", bildirim: true, oneri: true,
+            anahtar: `yoklama:${bekleyen}`, ton: "uyari", isaret: "!",
             baslik: "Bekleyen yoklamaları doldur", aciklama: `${bekleyen} oturum bekliyor`,
             eylem: () => cubukOgesineBasildi("yoklama"),
         });
     }
     if (!yoklamaVerisi.donem && dersler.length > 0) {
         maddeler.push({
-            anahtar: "donem-yok", ton: "uyari", isaret: "!", bildirim: true, oneri: true,
+            anahtar: "donem-yok", ton: "uyari", isaret: "!",
             baslik: "Dönem tarihlerini gir", aciklama: "Yoklama ve devamsızlık takibi için gerekli",
             eylem: () => cubukOgesineBasildi("akademik"),
         });
     }
-    // 7 gün içindeki sınav ve kalemler (sadece bildirim).
+    // 7 gün içindeki sınav ve kalemler.
     for (const { ders, kalem, gun } of yaklasanKalemler()) {
         if (gun > 7) break;
         maddeler.push({
-            anahtar: `kalem:${kalem.id}`, ton: gun <= 3 ? "tehlike" : "uyari", isaret: "◆", bildirim: true, oneri: false,
+            anahtar: `kalem:${kalem.id}`, ton: gun <= 3 ? "tehlike" : "uyari", isaret: "◆",
             baslik: `${ders.kod} · ${turBul(kalem.tur).ad}`,
             aciklama: `${geriSayimYazisi(gun)} · ${kisaTarih(kalem.tarih)}` + (kalem.saat ? ` ${kalem.saat}` : ""),
             eylem: () => dersiAc(ders, "hesap", kalem.id),
@@ -276,7 +210,7 @@ function durumMaddeleri() {
     for (const ders of dersler) {
         if (!hedefHarf(ders)) {
             maddeler.push({
-                anahtar: `hedef:${ders.id}`, ton: "uyari", isaret: "!", bildirim: true, oneri: true,
+                anahtar: `hedef:${ders.id}`, ton: "uyari", isaret: "!",
                 baslik: `Hedef harf notu eksik: ${ders.kod}`, aciklama: "Dersi düzenleyip hedefini seç",
                 eylem: () => dersFormunuAc(ders),
             });
@@ -289,28 +223,17 @@ function durumMaddeleri() {
             const asildi = havuz.kalanHak < 0;
             maddeler.push({
                 anahtar: `devamsizlik:${ders.id}:${havuz.ad}:${asildi ? "asildi" : "yakin"}`,
-                ton: asildi ? "tehlike" : "uyari", isaret: asildi ? "✗" : "!", bildirim: true, oneri: true,
+                ton: asildi ? "tehlike" : "uyari", isaret: asildi ? "✗" : "!",
                 baslik: (asildi ? "Devamsızlık sınırı aşıldı: " : "Devamsızlık sınırına yaklaşıldı: ") + etiket,
                 aciklama: `Kullanılan ${ikiOndalik(havuz.gidilmeyen)} / ${ikiOndalik(havuz.limit)} ${birimAdi()}`,
                 eylem: () => dersiAc(ders, "devamsizlik"),
             });
         }
     }
-    // Tek kalemi kalan derslerde not hesabının kendi cümlesi (sadece öneri).
-    for (const ders of dersler) {
-        const mesaj = sonucMesaji(ders, notDurumunuHesapla(ders));
-        if (mesaj && mesaj.tekKalem) {
-            maddeler.push({
-                anahtar: `gereken:${ders.id}`, ton: "bilgi", isaret: "→", bildirim: false, oneri: true,
-                baslik: `${ders.kod}: ${mesaj.baslik}`, aciklama: `Hedef ${ders.hedef_not}`,
-                eylem: () => dersiAc(ders, "hesap"),
-            });
-        }
-    }
     return maddeler;
 }
 
-// Bir durum maddesinin satırı (bildirimlerde ve "Önerilen işler"de aynı görünüm).
+// Bir bildirimin satırı.
 function maddeSatiri(madde) {
     const isaret = eleman("span", `madde-isareti ${madde.ton}`, madde.isaret);
     isaret.setAttribute("aria-hidden", "true");
@@ -324,180 +247,6 @@ function bosSatir(yazi, onayli = false) {
 // ============================================================
 // KARTLAR
 // ============================================================
-
-// Mini rakam kartı: simge karesi + başlık, büyük değer (+ soluk birim), altında küçük açıklama.
-function miniKart({ baslik, simge, kare, deger, birim, aciklama }) {
-    const kart = eleman("div", "mini-kart");
-    const ust = eleman("div", "mini-baslik");
-    const simgeKaresi = eleman("span", `simge-karesi kucuk kare-${kare}`);
-    simgeKaresi.appendChild(ozetSimgesi(simge));
-    ust.append(simgeKaresi, eleman("span", "", baslik));
-    const degerSatiri = eleman("div", "mini-deger");
-    degerSatiri.appendChild(eleman("strong", "", deger));
-    if (birim) degerSatiri.appendChild(eleman("small", "", birim));
-    kart.append(ust, degerSatiri, eleman("p", "", aciklama));
-    return kart;
-}
-
-function miniKartlar() {
-    const izgara = eleman("div", "mini-kartlar");
-    const birim = birimAdi();
-
-    const hafta = haftaOzeti();
-    izgara.appendChild(miniKart({
-        baslik: "Bu hafta", simge: "takvim", kare: "kirmizi",
-        deger: ikiOndalik(hafta.saat), birim: "saat", aciklama: `${hafta.oturumSayisi} oturum`,
-    }));
-
-    const katilim = katilimOzeti();
-    izgara.appendChild(miniKart(katilim.yuzde === null
-        ? { baslik: "Katılım", simge: "onay", kare: "yesil", deger: "—", aciklama: "Henüz veri yok" }
-        : {
-            baslik: "Katılım", simge: "onay", kare: "yesil",
-            deger: `%${Math.round(katilim.yuzde * 10) / 10}`,
-            aciklama: `${ikiOndalik(katilim.gidilen)} ${birim} gidildi · ${ikiOndalik(katilim.gidilmeyen)} ${birim} gidilmedi`,
-        }));
-
-    const sonraki = yaklasanKalemler()[0];
-    izgara.appendChild(miniKart(sonraki
-        ? {
-            baslik: "Sonraki sınav", simge: "saat", kare: "mor",
-            deger: sonraki.gun === 0 ? "Bugün" : String(sonraki.gun), birim: sonraki.gun === 0 ? "" : "gün",
-            aciklama: `${sonraki.ders.kod} · ${turBul(sonraki.kalem.tur).ad}`,
-        }
-        : { baslik: "Sonraki sınav", simge: "saat", kare: "mor", deger: "—", aciklama: "Tarihli sınav yok" }));
-
-    const donem = donemDurumu();
-    let donemMini = { baslik: "Dönem", simge: "sapka", kare: "mavi", deger: "—", aciklama: "Dönem tanımlı değil" };
-    if (donem && (!donem.basladi || donem.bitti)) {
-        donemMini.aciklama = donemBilgisi(bugunTarihi()).yazi;   // "Dönem 5 Ekim'de başlıyor" / "Dönem bitti"
-    } else if (donem) {
-        const finalVar = Boolean(donem.donem.final_baslangic);
-        const kalan = gunFarki(finalVar ? donem.donem.final_baslangic : donem.donem.bitis);
-        donemMini.deger = `${donem.hafta}.`;
-        donemMini.birim = "hafta";
-        donemMini.aciklama = finalVar
-            ? (kalan > 0 ? `Final'e ${kalan} gün` : "Final dönemi başladı")
-            : `Dönem sonuna ${kalan} gün`;
-    }
-    izgara.appendChild(miniKart(donemMini));
-    return izgara;
-}
-
-function bugunKarti() {
-    const oturumlar = bugunkuOturumlar();
-    const { kart, govde } = ozetKarti({
-        baslik: "Bugün", simge: "gunes", kare: "mor", ton: "bilgi",
-        rozet: hapRozet(oturumlar.length > 0 ? `${oturumlar.length} ders` : "Ders yok"),
-    });
-    if (oturumlar.length === 0) govde.appendChild(bosSatir("Bugün ders yok", true));
-    for (const { ders, oturum, durum } of oturumlar) {
-        govde.appendChild(icSatir({
-            sol: dersKaresi(ders), baslik: ders.kod,
-            aciklama: `${oturum.baslangic}-${oturum.bitis} · ${oturum.derslik}`,
-            sag: hapRozet(durum[0], durum[1]),
-            eylem: () => dersiAc(ders),
-        }));
-    }
-    return kart;
-}
-
-function yaklasanKarti() {
-    const kalemler = yaklasanKalemler().filter((satir) => satir.gun <= 14);
-    const { kart, govde } = ozetKarti({
-        baslik: "Yaklaşan", simge: "bayrak", kare: "kirmizi", ton: "tehlike", rozet: hapRozet("14 gün", "tehlike"),
-    });
-    if (kalemler.length === 0) govde.appendChild(bosSatir("Önümüzdeki 14 günde sınav yok"));
-    for (const { ders, kalem, gun } of kalemler.slice(0, 5)) {
-        govde.appendChild(icSatir({
-            sol: dersKaresi(ders), baslik: `${ders.kod} · ${turBul(kalem.tur).ad}`,
-            aciklama: kisaTarih(kalem.tarih) + (kalem.saat ? ` · ${kalem.saat}` : ""),
-            // 3 gün ve altı kırmızı, 7 gün ve altı sarı.
-            sag: hapRozet(geriSayimYazisi(gun), gun <= 3 ? "tehlike" : gun <= 7 ? "uyari" : "soluk"),
-            eylem: () => dersiAc(ders, "hesap", kalem.id),
-        }));
-    }
-    if (kalemler.length > 5) govde.appendChild(eleman("p", "kucuk-not", `+${kalemler.length - 5} daha`));
-    return kart;
-}
-
-function devamsizlikKarti() {
-    if (!yoklamaVerisi.donem) {
-        const { kart, govde } = ozetKarti({ baslik: "Devamsızlık", simge: "liste", kare: "turkuaz", ton: "turkuaz" });
-        govde.appendChild(icSatir({
-            baslik: "Dönem tarihlerini gir", aciklama: "Devamsızlık dönem tarihlerine göre hesaplanır",
-            eylem: () => cubukOgesineBasildi("akademik"),
-        }));
-        return kart;
-    }
-    const ozet = devamsizlikOzeti();
-    const rozetler = { guvende: ["Güvende", "olumlu"], dikkat: ["Dikkat", "uyari"], asildi: ["Sınır aşıldı", "tehlike"] };
-    const { kart, govde } = ozetKarti({
-        baslik: "Devamsızlık", simge: "liste", kare: "turkuaz", ton: "turkuaz",
-        rozet: ozet.satirlar.length > 0 ? hapRozet(...rozetler[ozet.genel]) : null,
-    });
-    if (ozet.satirlar.length === 0) govde.appendChild(bosSatir("Henüz ders eklenmemiş"));
-    const tonlar = { yesil: "olumlu", sari: "uyari", kirmizi: "tehlike" };
-    for (const { ders, havuz, etiket } of ozet.satirlar) {
-        govde.appendChild(etiketDeger(havuz.limit === null
-            ? { etiket, deger: "Limit girilmemiş", ton: "soluk", eylem: () => dersiAc(ders, "devamsizlik") }
-            : {
-                etiket, deger: `${ikiOndalik(havuz.gidilmeyen)} / ${ikiOndalik(havuz.limit)} ${birimAdi()}`,
-                ton: tonlar[havuz.renk], eylem: () => dersiAc(ders, "devamsizlik"),
-            }));
-    }
-    return kart;
-}
-
-function notlarKarti() {
-    const { kart, govde } = ozetKarti({
-        baslik: "Notlar", simge: "kalem", kare: "mor", ton: "bilgi", rozet: hapRozet(`${dersler.length} ders`),
-    });
-    if (dersler.length === 0) govde.appendChild(bosSatir("Henüz ders eklenmemiş"));
-    for (const ders of dersler) {
-        const durum = notDurumunuHesapla(ders);
-        const hedef = hedefHarf(ders);
-        let deger = "Puan girilmedi";
-        let ton = "soluk";
-        if (durum.girilenVar) {
-            // Not hesabı sekmesindekiyle aynı toplam ve harf; sonuç da aynı fonksiyondan.
-            deger = `${ikiOndalik(durum.kazanilan)} puan · ${harfSeviyesi(durum.kazanilan).harf}`
-                + ` → ${hedef ? hedef.harf : "?"}`;
-            const mesaj = sonucMesaji(ders, durum);
-            if (!hedef) ton = "soluk";
-            else if (mesaj === null) { ton = "olumlu"; deger = `✓ ${deger}`; }
-            else ton = mesaj.ulasilamaz ? "tehlike" : "uyari";
-        }
-        govde.appendChild(etiketDeger({ etiket: ders.kod, deger, ton, eylem: () => dersiAc(ders, "hesap") }));
-    }
-    return kart;
-}
-
-function gpaKarti() {
-    // GPA ekranındaki hesabın aynısı (gpaHesapla); harf olarak derse kayıtlı hedef kullanılır.
-    const sonuc = gpaHesapla(gpaAyarlari, hedefHarf);
-    if (!sonuc || sonuc.yeniGpa === undefined) {
-        const { kart, govde } = ozetKarti({ baslik: "GPA", simge: "cizgi", kare: "mor", ton: "bilgi" });
-        govde.appendChild(icSatir({
-            baslik: "GPA bilgilerini gir", aciklama: "Önceki kredi, önceki GPA ve derslerin hedef harfleri gerekli",
-            eylem: () => cubukOgesineBasildi("gpa"),
-        }));
-        return kart;
-    }
-    let rozet = null;
-    if (sonuc.hedefGpa !== undefined) {
-        rozet = sonuc.yeniGpa >= sonuc.hedefGpa ? hapRozet("Hedefte ✓", "olumlu") : hapRozet("Hedefin altında", "uyari");
-    }
-    const { kart, govde } = ozetKarti({ baslik: "GPA", simge: "cizgi", kare: "mor", ton: "bilgi", rozet });
-    const buyuk = eleman("div", "buyuk-deger");
-    buyuk.append(eleman("strong", "", gpaYaz(sonuc.yeniGpa)), eleman("small", "", "Yeni genel GPA"));
-    govde.appendChild(tiklanabilirYap(buyuk, () => cubukOgesineBasildi("gpa")));
-    govde.appendChild(etiketDeger({ etiket: "Mevcut GPA", deger: sonuc.oncekiGpa === null ? "— (ilk dönem)" : gpaYaz(sonuc.oncekiGpa) }));
-    govde.appendChild(etiketDeger({ etiket: "Bu dönem tahmini", deger: gpaYaz(sonuc.donemGpa) }));
-    govde.appendChild(etiketDeger({ etiket: "Toplam kredi", deger: `${ikiOndalik(sonuc.oncekiKredi)} → ${ikiOndalik(sonuc.toplamKredi)}` }));
-    govde.appendChild(etiketDeger({ etiket: "Hedef GPA", deger: sonuc.hedefGpa === undefined ? "—" : gpaYaz(sonuc.hedefGpa) }));
-    return kart;
-}
 
 function donemKarti() {
     const ozet = donemDurumu();
@@ -536,14 +285,75 @@ function donemKarti() {
     return kart;
 }
 
-function onerilerKarti(maddeler) {
-    const oneriler = maddeler.filter((madde) => madde.oneri).slice(0, 6);
+
+// "Sonraki sınav" kartı: Dönem ilerlemesiyle aynı düzen (solda halka, sağda etiket-değer satırları).
+// Halka, sınava 30 gün kala dolmaya başlar ve sınav günü tamamen dolar; ortasında kalan gün yazar.
+// Ton aciliyete göre değişir (8+ gün mor, 4-7 gün amber, 0-3 gün kırmızı); kalan gün her zaman
+// yazıyla da görünür.
+const SINAV_UFKU = 30;   // gün
+
+function sinavKarti() {
+    const kalemler = yaklasanKalemler();
+    const sonraki = kalemler[0];
+    const cevre = 2 * Math.PI * 26;
+
+    // Halkayı (ve ortasındaki yazıyı) hazırlar. doluluk: 0-1.
+    function halkaOlustur(doluluk, buyukYazi, kucukYazi, etiket) {
+        const halka = eleman("div", "ilerleme-halkasi tonlu-halka");
+        halka.innerHTML = `<svg viewBox="0 0 64 64" role="img" aria-label="${etiket}">
+            <circle class="halka-zemin" cx="32" cy="32" r="26"/>
+            <circle class="halka-dolu" cx="32" cy="32" r="26" stroke-dasharray="${cevre}" stroke-dashoffset="${cevre * (1 - doluluk)}"/>
+        </svg>`;
+        const orta = eleman("strong", kucukYazi ? "iki-satir" : "");
+        orta.appendChild(eleman("span", "", buyukYazi));
+        if (kucukYazi) orta.appendChild(eleman("small", "", kucukYazi));
+        halka.appendChild(orta);
+        return halka;
+    }
+
+    // Boş durum: tarihli sınav yok.
+    if (!sonraki) {
+        const { kart, govde } = ozetKarti({ baslik: "Sonraki sınav", simge: "kalem", kare: "mor", ton: "bilgi" });
+        const yazi = eleman("div", "halka-satirlari");
+        yazi.append(eleman("strong", "", "Yaklaşan tarihli sınav yok"),
+            eleman("p", "kucuk-not", "Sınav tarihlerini ders formundan girebilirsin"));
+        const duzen = eleman("div", "halka-duzeni");
+        duzen.append(halkaOlustur(0, "✓", "", "Yaklaşan tarihli sınav yok"), yazi);
+        govde.appendChild(duzen);
+        return kart;
+    }
+
+    const { ders, kalem, gun } = sonraki;
+    const ton = gun <= 3 ? "tehlike" : gun <= 7 ? "uyari" : "bilgi";
     const { kart, govde } = ozetKarti({
-        baslik: "Önerilen işler", simge: "kivilcim", kare: "turkuaz", ton: "turkuaz",
-        rozet: oneriler.length > 0 ? hapRozet(String(oneriler.length), "soluk") : null,
+        baslik: "Sonraki sınav", simge: "kalem", kare: "mor", ton,
+        rozet: hapRozet(turBul(kalem.tur).ad, ton === "bilgi" ? "" : ton),
     });
-    if (oneriler.length === 0) govde.appendChild(bosSatir("Her şey yolunda", true));
-    for (const madde of oneriler) govde.appendChild(maddeSatiri(madde));
+
+    const doluluk = Math.min(Math.max(1 - gun / SINAV_UFKU, 0), 1);
+    const geriSayim = geriSayimYazisi(gun);   // "Bugün", "Yarın" ya da "5 gün"
+    const halka = gun <= 1
+        ? halkaOlustur(doluluk, geriSayim, "", `Sınav ${geriSayim.toLocaleLowerCase("tr")}`)
+        : halkaOlustur(doluluk, String(gun), "gün", `Sınava ${gun} gün kaldı`);
+
+    const [yil, ay, ayinGunu] = kalem.tarih.split("-").map(Number);
+    const tarih = `${ayinGunu} ${AY_KISALTMALARI[ay - 1]}, ${AYARLAR.gunler[haftaninGunu(kalem.tarih)]}`
+        + (yil !== Number(bugunTarihi().slice(0, 4)) ? ` ${yil}` : "");
+    const saat = !kalem.saat ? "Belirtilmedi" : kalem.saat + (kalem.bitis_saat ? ` – ${kalem.bitis_saat}` : "");
+
+    const satirlar = eleman("div", "halka-satirlari");
+    satirlar.appendChild(etiketDeger({ etiket: "Ders", deger: ders.kod }));
+    satirlar.appendChild(etiketDeger({ etiket: "Tarih", deger: tarih }));
+    satirlar.appendChild(etiketDeger({ etiket: "Saat", deger: saat, ton: kalem.saat ? "" : "soluk" }));
+    satirlar.appendChild(etiketDeger({ etiket: "Ağırlık", deger: `%${kalem.agirlik}` }));
+
+    const duzen = eleman("div", "halka-duzeni");
+    duzen.append(halka, satirlar);
+    // Karta tıklayınca dersin "Not hesabı" sekmesi, bu kalemin satırı vurgulanarak açılır.
+    govde.appendChild(tiklanabilirYap(duzen, () => dersiAc(ders, "hesap", kalem.id)));
+
+    const ayniGun = kalemler.filter((satir) => satir.kalem.tarih === kalem.tarih).length - 1;
+    if (ayniGun > 0) govde.appendChild(eleman("p", "kucuk-not", `+${ayniGun} sınav daha aynı gün`));
     return kart;
 }
 
@@ -551,15 +361,15 @@ function onerilerKarti(maddeler) {
 // GENEL BAKIŞI ÇİZME
 // ============================================================
 
-// Bütün kartları kayıtlı veriden baştan çizer; kaydırma konumu korunur. Bildirimleri de günceller.
-// Veri ya da gösterilen hafta her değiştiğinde çağrılır (takvimiCiz'in sonunda, ayrıca 5 dakikada bir).
+// Üç kartı baştan çizer (Sonraki sınav, Dönem ilerlemesi, Hava durumu); kaydırma konumu korunur.
+// Bildirimleri de günceller. Hava durumu kartı elindeki son veriyi çizer, burada yeni istek atılmaz.
+// Veri her değiştiğinde çağrılır (takvimiCiz'in sonunda, ayrıca 5 dakikada bir).
 function genelBakisiCiz() {
     const gorunur = !genelBakis.hidden;
     if (gorunur) genelBakisKaydirmasi = genelBakis.scrollTop;
     const maddeler = durumMaddeleri();
     genelBakis.replaceChildren(
-        miniKartlar(), bugunKarti(), yaklasanKarti(), devamsizlikKarti(), notlarKarti(),
-        gpaKarti(), donemKarti(), onerilerKarti(maddeler),
+        sinavKarti(), donemKarti(), havaKarti(),
         eleman("p", "genel-ipucu", "Ayrıntı için takvimde bir derse tıkla"),
     );
     if (gorunur) genelBakis.scrollTop = genelBakisKaydirmasi;

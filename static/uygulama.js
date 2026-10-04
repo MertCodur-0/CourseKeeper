@@ -9,8 +9,6 @@ let dersler = [];               // sunucudan gelen bütün dersler
 // Devamsızlık için gereken veri: şimdiki zaman, dönem, ders yapılmayan tarihler, yoklama kayıtları.
 // Hesap ve arayüzü static/yoklama.js'tedir.
 let yoklamaVerisi = { simdi: "", donem: null, ders_disi_tarihler: [], kayitlar: [] };
-// Kayıtlı GPA ayarları (önceki kredi/GPA, hedef GPA, kredi birimi). "Genel bakış"taki GPA kartı kullanır.
-let gpaAyarlari = { onceki_kredi: null, onceki_gpa: null, hedef_gpa: null, kredi_birimi: "kredi" };
 let siradakiRenk = null;        // yeni derse önerilecek (kullanılmayan ilk) renk
 let duzenlenenDersId = null;    // formda açık olan dersin kimliği (yeni derste null)
 let okumaNo = 0;                // her syllabus okumasının numarası (pencere kapanınca eski okuma yok sayılır)
@@ -117,12 +115,11 @@ async function istekGonder(yontem, adres, veri) {
 // ============================================================
 
 async function dersleriYukle() {
-    // Sayfanın ihtiyaç duyduğu her şey tek bir salt okunur özetten gelir: dersler, dönem,
-    // yoklama kayıtları ve GPA ayarları. Böylece takvim, panel ve kartlar hep aynı veriyi görür.
+    // Sayfanın ihtiyaç duyduğu veri tek bir salt okunur özetten gelir: dersler, dönem ve
+    // yoklama kayıtları. Böylece takvim, panel ve kartlar hep aynı veriyi görür.
     const sonuc = await istekGonder("GET", "/api/ozet");
     dersler = sonuc.dersler;
     siradakiRenk = sonuc.siradaki_renk;
-    gpaAyarlari = sonuc.gpa;
     yoklamaVerisiniAl(sonuc);
     takvimiCiz();
     paneliYenile();
@@ -513,7 +510,7 @@ function takvimiCiz() {
     izgara.querySelectorAll(".serit").forEach((hucre) => { hucre.hidden = !seritDolu; });
     bloklariSigdir();
     seciliVurguyuGuncelle();
-    // Takvim her yeniden çizildiğinde (veri ya da gösterilen hafta değişti) "Genel bakış" da yenilenir.
+    // Takvim her yeniden çizildiğinde (veri değişti) "Genel bakış" ve bildirimler de yenilenir.
     genelBakisiCiz();
 }
 
@@ -1203,7 +1200,7 @@ function notDurumunuHesapla(ders) {
 }
 
 // Sonuç kutusunun alt notunu hazırlar: { baslik, ek: [satırlar], duzenle }
-// Hedefe ulaşıldıysa not yoktur, null döner. (ulasilamaz ve tekKalem işaretlerini "Genel bakış" kullanır.)
+// Hedefe ulaşıldıysa not yoktur, null döner.
 function sonucMesaji(ders, durum) {
     if (ders.degerlendirmeler.length === 0) {
         return { baslik: "Bu derse değerlendirme kalemi eklenmemiş.", ek: ["Kalemleri “Düzenle” ile ekleyebilirsin."], duzenle: true };
@@ -1224,9 +1221,7 @@ function sonucMesaji(ders, durum) {
                 ? "Ekstra puanlarla ulaşılabilir."
                 : "Ekstra puanlarla da ulaşılamıyor.");
         }
-        // ulasilamaz: kalan ekstra puanlarla da hedefe varılamıyor.
-        return { baslik: `Hedef ${hedef.harf} için ${ikiOndalik(gereken, true)} puan eksik.`, ek,
-                 ulasilamaz: gereken > durum.kalanEkstraPuan };
+        return { baslik: `Hedef ${hedef.harf} için ${ikiOndalik(gereken, true)} puan eksik.`, ek };
     }
 
     // Kalan normal kalemlerin hepsinden tam puan alınsa bile yetmiyor.
@@ -1237,7 +1232,7 @@ function sonucMesaji(ders, durum) {
                 ek: [`Ekstra puanları da alırsan kalan kalemlerden toplam en az ${yukariYuvarla(gereken - durum.kalanEkstraPuan)} puan yeterli.`],
             };
         }
-        return { baslik: "Bu hedefe ulaşmak mümkün görünmüyor.", ulasilamaz: true };
+        return { baslik: "Bu hedefe ulaşmak mümkün görünmüyor." };
     }
 
     // Tek kalem kaldı.
@@ -1246,10 +1241,9 @@ function sonucMesaji(ders, durum) {
         const tur = turBul(kalem.tur);
         if (yuzUzerindenMi(kalem)) {
             // Vize/final: gereken puan 100 üzerinden söylenir.
-            // tekKalem: tek bir kalem kaldı ("Önerilen işler" bu cümleyi kullanır).
-            return { baslik: `${tur.den_hali} en az ${yukariYuvarla(gereken / kalem.agirlik * 100)} almalısın.`, tekKalem: true };
+            return { baslik: `${tur.den_hali} en az ${yukariYuvarla(gereken / kalem.agirlik * 100)} almalısın.` };
         }
-        return { baslik: `${tur.ad} için en az ${yukariYuvarla(gereken)} puan gerekiyor (${kalem.agirlik} üzerinden).`, tekKalem: true };
+        return { baslik: `${tur.ad} için en az ${yukariYuvarla(gereken)} puan gerekiyor (${kalem.agirlik} üzerinden).` };
     }
 
     // Birden fazla kalem kaldı: toplam puan olarak söylenir.

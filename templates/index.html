@@ -250,7 +250,7 @@
     <div class="cekmece-perdesi" id="cekmece-perdesi" hidden></div>
 
     <!-- ============================================================
-         AYARLAR PENCERESİ: bölümlü ("Görünüm" ve "Profil"). Yeni ayarlar yeni bölüm olarak eklenir.
+         AYARLAR PENCERESİ: bölümlü ("Görünüm", "Konum" ve "Profil"). Yeni ayarlar yeni bölüm olarak eklenir.
          Değerler tarayıcıda saklanır (küçük arayüz tercihleri).
          ============================================================ -->
     <dialog class="pencere ayarlar-penceresi" id="ayarlar-penceresi">
@@ -266,6 +266,20 @@
                 <button type="button" role="radio" data-tema-secimi="koyu">Koyu</button>
             </div>
             <p class="kucuk-not">“Sistem” seçiliyken Mac'in görünümü değişince sayfa da değişir.</p>
+        </section>
+        <section class="ayar-bolumu" id="ayar-konum">
+            <h3>Konum</h3>
+            <!-- Hava durumu kartı için şehir. Konum izni istenmez; şehri sen seçersin. -->
+            <div class="ders-formu">
+                <p class="kucuk-not" id="secili-sehir"></p>
+                <label class="alan">
+                    <span>Şehir</span>
+                    <input type="text" id="sehir-kutusu" autocomplete="off" spellcheck="false" placeholder="Şehir adı yaz (en az 2 harf)">
+                </label>
+                <div class="sehir-sonuclari" id="sehir-sonuclari"></div>
+                <span class="not-durumu" id="sehir-durumu"></span>
+                <button type="button" class="dugme" id="sehri-kaldir" hidden>Şehri kaldır</button>
+            </div>
         </section>
         <section class="ayar-bolumu" id="ayar-profil">
             <h3>Profil</h3>
@@ -754,5 +768,7 @@
     <script src="{{ url_for('static', filename='arama.js') }}"></script>
     <!-- Kabuk: sol çubuk, üst çubuk, karşılama, pencerelerin açılıp kapanması, tema ve profil. -->
     <script src="{{ url_for('static', filename='kabuk.js') }}"></script>
+    <!-- Hava durumu kartı ve Ayarlar > Konum'daki şehir seçimi. -->
+    <script src="{{ url_for('static', filename='hava.js') }}"></script>
 </body>
 </html>

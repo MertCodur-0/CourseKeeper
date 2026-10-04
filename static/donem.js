@@ -490,9 +490,8 @@ async function gpaAyarlariniKaydet() {
     gpaCiz();
     if (!gecerli) return;
     try {
-        gpaAyarlari = await istekGonder("PUT", "/api/gpa", ayarlar);
+        await istekGonder("PUT", "/api/gpa", ayarlar);
         gpaKayitDurumu.textContent = "Kaydedildi";
-        genelBakisiCiz();   // "Genel bakış"taki GPA kartı yeni ayarları göstersin
     } catch (hata) {
         mesajGoster(gpaHatasi, hata.message);
     }
@@ -510,14 +509,12 @@ function gecerliHarf(ders) {
 }
 
 // GPA hesabı. Sadece "GPA'ya dahil" işaretli, hedef harfi ve seçilen birimde kredisi olan dersler girer.
-// harfBul: dersin harfini veren fonksiyon. Dönem ekranı simülasyondaki harfi (gecerliHarf),
-// "Genel bakış"taki GPA kartı ise derse kayıtlı hedefi (hedefHarf) kullanır; hesap aynıdır.
-function gpaHesapla(ayarlar, harfBul = gecerliHarf) {
+function gpaHesapla(ayarlar) {
     let donemKredisi = 0;   // Kd
     let donemPuani = 0;     // Pd = Σ(kredi × harf puanı)
     for (const ders of dersler) {
         const kredi = ders[ayarlar.kredi_birimi];
-        const harf = harfBul(ders);
+        const harf = gecerliHarf(ders);
         if (!ders.gpaya_dahil || kredi == null || !harf) continue;
         donemKredisi += kredi;
         donemPuani += kredi * harf.katsayi;
@@ -666,7 +663,6 @@ function gpaTablosunuCiz(krediBirimi) {
                 mesajGoster(gpaHatasi, hata.message);
             }
             gpaCiz();
-            genelBakisiCiz();
         });
         satir.insertCell().appendChild(kutu);
     }
