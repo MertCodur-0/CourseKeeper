@@ -4,9 +4,8 @@
 
 Üniversite öğrencileri için kişisel akademik takip uygulaması. Derslerini, sınavlarını, notlarını, devamsızlığını ve GPA'ini tek bir ekranda takip edersin. Mac'te yerel olarak çalışır; verilerin bilgisayarında kalır.
 
-<!-- Ekran görüntülerini veya GIF'leri docs/ klasörüne koyup buraya ekle, örneğin:
-![Ana ekran](docs/ana-ekran.png)
--->
+https://github.com/user-attachments/assets/74a04834-2f04-435e-a368-fb425d51df50
+
 
 ## Özellikler
 
