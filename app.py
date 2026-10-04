@@ -890,6 +890,20 @@ def syllabus_forma_cevir(ham):
     return ders, uyarilar
 
 
+def harf_tablosu():
+    """Yardım penceresindeki notlandırma tablosu: NOT_OLCEGI'nden üretilir (ayrı bir kopya yoktur).
+
+    Her harfin puan aralığı, kendi alt sınırından bir üstteki harfin alt sınırının bir eksiğine kadardır.
+    """
+    satirlar = []
+    ust_sinir = 100
+    for harf in NOT_OLCEGI:
+        satirlar.append({"harf": harf["harf"], "aralik": f'{harf["alt_sinir"]}-{ust_sinir}',
+                         "katsayi": f'{harf["katsayi"]:.2f}'})
+        ust_sinir = harf["alt_sinir"] - 1
+    return satirlar
+
+
 # ============================================================
 # SAYFALAR
 # ============================================================
@@ -905,6 +919,7 @@ def ana_sayfa():
         ilk_saat=ILK_SAAT,
         renkler=RENKLER,
         hedef_notlari=HEDEF_NOTLARI,
+        harf_tablosu=harf_tablosu(),
         baslangic_saatleri=BASLANGIC_SAATLERI,
         bitis_saatleri=BITIS_SAATLERI,
         oturum_turleri=OTURUM_TURLERI,
@@ -1127,18 +1142,98 @@ def api_donemi_sil():
 
 # ---------- Yoklama ----------
 
-@app.route("/api/yoklama", methods=["GET"])
-def api_yoklamayi_getir():
-    """Devamsızlık hesabı için gereken her şeyi döndürür: şimdiki zaman, dönem, ders yapılmayan
-    tarihler ve bütün yoklama kayıtları. Hesap tarayıcıda yapılır (static/yoklama.js)."""
-    baglanti = veritabani_baglan()
+def yoklama_verisi(baglanti):
+    """Devamsızlık hesabı için gereken her şey: şimdiki zaman, dönem, ders yapılmayan tarihler
+    ve bütün yoklama kayıtları. Hesap tarayıcıda yapılır (static/yoklama.js)."""
     sonuc = donemi_getir(baglanti)
     sonuc["kayitlar"] = [dict(satir) for satir in baglanti.execute(
         "SELECT oturum_id, tarih, durum FROM yoklamalar ORDER BY tarih, oturum_id"
     )]
-    baglanti.close()
     sonuc["simdi"] = simdi().strftime("%Y-%m-%dT%H:%M")
+    return sonuc
+
+
+@app.route("/api/yoklama", methods=["GET"])
+def api_yoklamayi_getir():
+    baglanti = veritabani_baglan()
+    sonuc = yoklama_verisi(baglanti)
+    baglanti.close()
     return jsonify(sonuc)
+
+
+@app.route("/api/ozet", methods=["GET"])
+def api_ozet():
+    """Salt okunur özet: sayfanın (takvim, sağ paneldeki "Genel bakış", zil, rozetler) ihtiyaç
+    duyduğu bütün veriyi tek istekte döndürür: dersler, dönem, ders yapılmayan tarihler, yoklama
+    kayıtları, GPA ayarları ve şimdiki zaman.
+
+    Hiçbir şey hesaplamaz ve değiştirmez. Not, GPA ve devamsızlık hesapları tek bir yerde,
+    tarayıcıdaki mevcut fonksiyonlardadır; kartlar o fonksiyonları kullanır (hesap kopyalanmaz).
+    """
+    baglanti = veritabani_baglan()
+    sonuc = yoklama_verisi(baglanti)
+    sonuc["dersler"] = dersleri_getir(baglanti)
+    sonuc["siradaki_renk"] = siradaki_renk(baglanti)
+    sonuc["gpa"] = gpa_ayarlarini_getir(baglanti)
+    baglanti.close()
+    return jsonify(sonuc)
+
+
+# ---------- Arama ----------
+
+def arama_anahtari(yazi):
+    """Yazıyı aramada karşılaştırmak için sadeleştirir: küçük harf ve i/ı/İ/I ayrımı olmadan.
+
+    Türkçede "I"nın küçüğü "ı", "İ"nin küçüğü "i"dir; düz lower() bunları karıştırır. Dört harfi
+    de "i" sayınca "LIBE" yazan kodu "libe" de, "ISIL" yazan adı "ısıl" da bulur.
+    (Her harf yine tek harfe çevrildiği için eşleşmenin yeri asıl yazıdaki yeriyle aynıdır.)
+    """
+    return yazi.replace("İ", "i").replace("I", "i").replace("ı", "i").lower()
+
+
+@app.route("/api/ara", methods=["GET"])
+def api_ara():
+    """Derslerde (kod, ad), değerlendirme kalemlerinde (tür, ad, ders kodu) ve ders notlarında arar.
+
+    Salt okunur. Aranan metin SQL'e hiç girmez: sorgular sabittir, eşleştirme Python'da yapılır.
+    En fazla 8 sonuç döner: {"sonuclar": [{grup, ders_id, kalem_id, renk, baslik, aciklama}]}.
+    """
+    aranan = arama_anahtari(metin(request.args.get("q"))[:60])
+    if len(aranan) < 2:
+        return jsonify({"sonuclar": []})
+    baglanti = veritabani_baglan()
+    dersler = dersleri_getir(baglanti)
+    baglanti.close()
+
+    tur_adlari = {tur["anahtar"]: tur["ad"] for tur in DEGERLENDIRME_TURLERI}
+    ders_sonuclari, kalem_sonuclari, not_sonuclari = [], [], []
+    for ders in dersler:
+        ortak = {"ders_id": ders["id"], "renk": ders["renk"]}
+        kod_eslesti = aranan in arama_anahtari(ders["kod"])
+        if kod_eslesti or aranan in arama_anahtari(ders["ad"] or ""):
+            ders_sonuclari.append({**ortak, "grup": "dersler", "kalem_id": None,
+                                   "baslik": ders["kod"], "aciklama": ders["ad"] or ""})
+        for kalem in ders["degerlendirmeler"]:
+            tur_adi = tur_adlari.get(kalem["tur"], kalem["tur"])
+            if kod_eslesti or aranan in arama_anahtari(tur_adi) or aranan in arama_anahtari(kalem["ad"] or ""):
+                aciklama = [f'%{kalem["agirlik"]:g}']
+                if kalem["tarih"]:
+                    aciklama.append(".".join(reversed(kalem["tarih"].split("-"))))
+                if kalem["ad"] and arama_anahtari(kalem["ad"]) != arama_anahtari(tur_adi):
+                    aciklama.append(kalem["ad"])
+                kalem_sonuclari.append({**ortak, "grup": "kalemler", "kalem_id": kalem["id"],
+                                        "baslik": f'{ders["kod"]} · {tur_adi}', "aciklama": " · ".join(aciklama)})
+        notlar = ders["notlar"] or ""
+        yer = arama_anahtari(notlar).find(aranan)
+        if yer != -1:
+            # Eşleşen kısmın çevresinden kısa bir özet.
+            bas, son = max(0, yer - 30), min(len(notlar), yer + len(aranan) + 40)
+            ozet = ("…" if bas > 0 else "") + " ".join(notlar[bas:son].split()) + ("…" if son < len(notlar) else "")
+            not_sonuclari.append({**ortak, "grup": "notlar", "kalem_id": None,
+                                  "baslik": ders["kod"], "aciklama": ozet})
+    # Toplam en fazla 8: önce dersler, sonra kalemler, sonra notlar (her gruba yer kalsın diye sınırlı).
+    sonuclar = ders_sonuclari[:3] + kalem_sonuclari[:4] + not_sonuclari[:3]
+    return jsonify({"sonuclar": sonuclar[:8]})
 
 
 @app.route("/api/yoklama", methods=["PUT"])

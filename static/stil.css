@@ -746,16 +746,6 @@ body {
     min-height: 0;
 }
 
-.panel-bos {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    text-align: center;
-    color: var(--soluk-yazi);
-}
 
 .ders-paneli {
     display: flex;
@@ -2017,10 +2007,6 @@ body {
     cursor: pointer;
 }
 
-.donem-uyari-karti {
-    margin: 0;
-    text-align: left;
-}
 
 /* ---------- Takvimdeki yoklama simgesi: bloğun çekirdek alanının sol üst köşesinde ---------- */
 
@@ -2514,3 +2500,613 @@ body {
     }
 }
 
+/* ============================================================
+   GENEL BAKIŞ (sağ panel, ders seçili değilken): kart yığını
+   Mevcut bileşenlerle kurulur: tonlu kart, iç satır, hap rozet, simge karesi.
+   ============================================================ */
+.genel-bakis {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px 16px 24px;
+    overflow-y: auto;
+}
+
+/* Ton sınıfları: tonlu kartın rengini ve okunur yazı rengini belirler (ton renkleri en üstte tanımlı;
+   buradaki üçlüler onların rgba() içinde kullanılabilen hali). */
+.ton-bilgi { --ton-rgb: 129, 140, 248; --ton-yazi: var(--ton-bilgi-yazi); }
+.ton-tehlike { --ton-rgb: 248, 113, 113; --ton-yazi: var(--ton-tehlike-yazi); }
+.ton-turkuaz { --ton-rgb: 45, 212, 191; --ton-yazi: var(--ton-turkuaz-yazi); }
+.ton-mavi { --ton-rgb: 79, 142, 247; --ton-yazi: var(--vurgu-yazi); }
+
+/* Tonlu kart: üstte tonun çok hafif geçişi, kenarlıkta tonun soluk hali. */
+.tonlu {
+    border: 1px solid rgba(var(--ton-rgb), 0.22);
+    border-radius: var(--kart-kosesi);
+    background: linear-gradient(180deg, rgba(var(--ton-rgb), 0.10), transparent 60%) var(--yuzey);
+    transition: border-color var(--gecis);
+}
+
+.tonlu:hover {
+    border-color: rgba(var(--ton-rgb), 0.45);
+}
+
+.ozet-karti {
+    padding: 14px;
+}
+
+/* Kart başlığı: renkli simge karesi, başlık ve sağda hap rozet. */
+.ozet-basligi {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.ozet-basligi h3 {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.ozet-govdesi {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Simge karesinin renkleri ve küçük hali */
+.simge-karesi.kare-kirmizi { background: var(--kare-kirmizi); }
+.simge-karesi.kare-yesil { background: var(--kare-yesil); }
+.simge-karesi.kare-mor { background: var(--kare-mor); }
+.simge-karesi.kare-mavi { background: var(--kare-mavi); }
+.simge-karesi.kare-turkuaz { background: var(--kare-turkuaz); }
+
+.simge-karesi.kucuk {
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+}
+
+.simge-karesi.kucuk .simge {
+    width: 16px;
+    height: 16px;
+}
+
+/* Hap rozetin ton halleri */
+.hap {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.hap.olumlu { color: var(--ton-olumlu-yazi); }
+.hap.uyari { color: var(--ton-uyari-yazi); }
+.hap.tehlike { color: var(--ton-tehlike-yazi); }
+.hap.vurgu { color: var(--vurgu-yazi); }
+.hap.soluk { color: var(--soluk-yazi); }
+
+/* İç satır: ikincil yüzey, yuvarlak köşe; solda işaret, ortada başlık + açıklama, sağda çip. */
+.ic-satir {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: var(--yuzey-2);
+    transition: filter var(--gecis), background var(--gecis);
+}
+
+.ic-satir.bos {
+    color: var(--soluk-yazi);
+}
+
+.ic-satir-yazisi {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.ic-satir-yazisi strong {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.ic-satir-yazisi small {
+    font-size: 12px;
+    color: var(--soluk-yazi);
+    overflow-wrap: anywhere;
+}
+
+/* Tıklanabilir satırlar: üzerine gelince hafifçe aydınlanır, klavye odağında halka çıkar. */
+.tiklanabilir {
+    cursor: pointer;
+}
+
+.tiklanabilir:hover,
+.ic-satir[aria-selected="true"] {
+    filter: brightness(1.12);
+}
+
+:root[data-tema="acik"] .tiklanabilir:hover,
+:root[data-tema="acik"] .ic-satir[aria-selected="true"] {
+    filter: brightness(0.96);
+}
+
+.tiklanabilir:focus-visible {
+    outline: 2px solid var(--vurgu);
+    outline-offset: 2px;
+}
+
+/* Dersin rengini taşıyan küçük kare */
+.ders-karesi {
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 4px;
+}
+
+/* "Etiket solda, değer sağda" satırı */
+.ed-satiri {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 4px;
+    border-radius: 8px;
+}
+
+.ed-satiri + .ed-satiri {
+    border-top: 1px solid var(--cizgi);
+}
+
+.ed-etiket {
+    color: var(--soluk-yazi);
+}
+
+.ed-deger {
+    font-weight: 600;
+    text-align: right;
+}
+
+.ed-deger.olumlu { color: var(--ton-olumlu-yazi); }
+.ed-deger.uyari { color: var(--ton-uyari-yazi); }
+.ed-deger.tehlike { color: var(--ton-tehlike-yazi); }
+.ed-deger.soluk { color: var(--soluk-yazi); font-weight: 400; }
+
+/* Durum maddesinin işareti (bildirimler ve önerilen işler): tonlu küçük daire içinde simge */
+.madde-isareti {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--yuzey);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.madde-isareti.uyari { color: var(--ton-uyari-yazi); }
+.madde-isareti.tehlike { color: var(--ton-tehlike-yazi); }
+.madde-isareti.bilgi { color: var(--ton-bilgi-yazi); }
+.madde-isareti.olumlu { color: var(--ton-olumlu-yazi); }
+
+/* ---------- Mini rakam kartları (2×2; panel darsa tek sütun) ---------- */
+
+.mini-kartlar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+}
+
+.mini-kart {
+    padding: 12px;
+    border: 1px solid var(--cerceve);
+    border-radius: var(--ic-kose);
+    background: var(--yuzey-2);
+    transition: border-color var(--gecis);
+}
+
+.mini-kart:hover {
+    border-color: var(--cerceve-parlak);
+}
+
+.mini-baslik {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--soluk-yazi);
+}
+
+.mini-deger {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    margin-top: 10px;
+}
+
+.mini-deger strong {
+    font-size: 26px;
+    font-weight: 600;
+    line-height: 1.1;
+}
+
+.mini-deger small {
+    font-size: 13px;
+    color: var(--soluk-yazi);
+}
+
+.mini-kart p {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: var(--soluk-yazi);
+}
+
+/* GPA kartındaki büyük değer */
+.buyuk-deger {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 2px 4px 6px;
+    border-radius: 8px;
+}
+
+.buyuk-deger strong {
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1.1;
+}
+
+.buyuk-deger small {
+    color: var(--soluk-yazi);
+}
+
+/* ---------- Dönem ilerlemesi: solda halka, sağda satırlar ---------- */
+
+.halka-duzeni {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border-radius: 12px;
+}
+
+.ilerleme-halkasi {
+    position: relative;
+    flex-shrink: 0;
+    width: 76px;
+    height: 76px;
+}
+
+.ilerleme-halkasi svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);    /* dolgu saat 12'den başlasın */
+}
+
+.ilerleme-halkasi circle {
+    fill: none;
+    stroke-width: 6;
+}
+
+.halka-zemin {
+    stroke: var(--ilerleme-zemin);
+}
+
+.halka-dolu {
+    stroke: var(--kare-mavi);
+    stroke-linecap: round;
+}
+
+.ilerleme-halkasi strong {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+}
+
+.halka-satirlari {
+    flex: 1;
+    min-width: 0;
+}
+
+.genel-ipucu {
+    margin: 0;
+    text-align: center;
+    font-size: 12px;
+    color: var(--soluk-yazi);
+}
+
+/* Ders panelinin üstündeki "← Genel bakış" düğmesi */
+.geri-dugmesi {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 6px;
+    margin: -4px 0 -2px -6px;
+    padding: 4px 8px 4px 6px;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    color: var(--soluk-yazi);
+    font: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+    transition: background var(--gecis), color var(--gecis);
+}
+
+.geri-dugmesi:hover {
+    background: var(--yuzey-2);
+    color: var(--baslik-rengi);
+}
+
+.geri-dugmesi:focus-visible {
+    outline: 2px solid var(--vurgu);
+    outline-offset: 2px;
+}
+
+.geri-dugmesi .simge {
+    width: 15px;
+    height: 15px;
+}
+
+/* ============================================================
+   ÜST ÇUBUK: arama kutusu, zil ve açılır kartları
+   ============================================================ */
+
+/* Kutunun ve zilin altında açılan kart */
+.acilir-kart {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 30;
+    max-height: min(70vh, 520px);
+    padding: 12px;
+    overflow-y: auto;
+    border: 1px solid var(--cerceve);
+    border-radius: var(--ic-kose);
+    background: var(--yuzey);
+    box-shadow: var(--pencere-golgesi);
+}
+
+.arama {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 280px;
+    height: 38px;
+    padding: 0 10px;
+    border: 1px solid var(--cerceve);
+    border-radius: 12px;
+    background: var(--yuzey);
+    color: var(--soluk-yazi);
+    transition: border-color var(--gecis), width var(--gecis);
+}
+
+.arama:focus-within {
+    border-color: var(--vurgu);
+}
+
+.arama .simge {
+    width: 17px;
+    height: 17px;
+}
+
+.arama input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: none;
+    color: var(--baslik-rengi);
+    font: inherit;
+    font-size: 13.5px;
+}
+
+.arama input::placeholder {
+    color: var(--soluk-yazi);
+}
+
+kbd {
+    padding: 1px 6px;
+    border: 1px solid var(--cerceve);
+    border-radius: 6px;
+    background: var(--yuzey-2);
+    color: var(--soluk-yazi);
+    font: inherit;
+    font-size: 11.5px;
+    white-space: nowrap;
+}
+
+.arama-sonuclari {
+    left: 0;
+    right: auto;
+    width: max(100%, 340px);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.arama-grubu {
+    margin: 4px 4px 0;
+    font-size: 12px;
+    color: var(--soluk-yazi);
+}
+
+.zil-alani {
+    position: relative;
+}
+
+/* Zil: kenarlıklı yuvarlak kare düğme */
+.zil {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--cerceve);
+    border-radius: 12px;
+    background: var(--yuzey);
+    color: var(--soluk-yazi);
+    cursor: pointer;
+    transition: border-color var(--gecis), color var(--gecis);
+}
+
+.zil:hover {
+    border-color: var(--cerceve-parlak);
+    color: var(--baslik-rengi);
+}
+
+/* Okunmamış bildirim noktası (zilde ve sol çubuktaki "Bildirimler" öğesinde) */
+.bildirim-noktasi {
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ton-tehlike);
+}
+
+.zil .bildirim-noktasi {
+    position: absolute;
+    top: 7px;
+    right: 8px;
+    box-shadow: 0 0 0 2px var(--yuzey);
+}
+
+:root[data-cubuk="dar"] .cubuk-ogesi .bildirim-noktasi {
+    position: absolute;
+    top: 9px;
+    right: 9px;
+}
+
+.bildirim-karti {
+    width: 340px;
+    max-width: calc(100vw - 32px);
+}
+
+/* Dar ekranda arama kutusu simgeye daralır; tıklayınca (odaklanınca) genişler. */
+@media (max-width: 1099px) {
+    .arama {
+        width: 38px;
+        padding: 0 9px;
+    }
+
+    .arama .arama-kisayolu {
+        display: none;
+    }
+
+    .arama input {
+        cursor: pointer;
+    }
+
+    .arama:focus-within {
+        width: min(280px, 46vw);
+    }
+
+    .arama:focus-within input {
+        cursor: text;
+    }
+}
+
+@media (max-width: 899px) {
+    .donem-bilgisi,
+    .kullanici-adi {
+        display: none;            /* dar ekranda kullanıcı alanında sadece avatar kalır */
+    }
+}
+
+/* ============================================================
+   YARDIM PENCERESİ
+   ============================================================ */
+.yardim-penceresi {
+    width: min(860px, calc(100vw - var(--cubuk-genisligi) - 32px));
+    font-size: 13px;
+}
+
+.yardim-kartlari {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 12px;
+}
+
+.yardim-karti {
+    padding: 14px 16px;
+    border: 1px solid var(--cerceve);
+    border-radius: var(--ic-kose);
+    background: var(--yuzey-2);
+}
+
+.yardim-karti.genis {
+    grid-column: 1 / -1;
+}
+
+.yardim-karti h3 {
+    margin: 0 0 8px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.etiket-deger {
+    margin: 0;
+}
+
+.etiket-deger div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+}
+
+.etiket-deger div + div {
+    border-top: 1px solid var(--cizgi);
+}
+
+.etiket-deger dt {
+    flex-shrink: 0;
+}
+
+.etiket-deger dd {
+    margin: 0;
+    text-align: right;
+    color: var(--soluk-yazi);
+}
+
+.yardim-karti .hap {
+    background: var(--yuzey);
+}
+
+/* Takvimdeki yoklama simgesinin örneği (konumlandırılmamış hali) */
+.yoklama-simgesi.ornek {
+    position: static;
+    display: inline-flex;
+}
+
+.yardim-tablosu th {
+    padding: 0 8px 6px 0;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--soluk-yazi);
+}
+
+.yardim-listesi {
+    margin: 0;
+    padding-left: 18px;
+    line-height: 1.5;
+}
+
+.yardim-listesi li + li {
+    margin-top: 4px;
+}

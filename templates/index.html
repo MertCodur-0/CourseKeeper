@@ -66,9 +66,17 @@
                     <svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
                     <span class="cubuk-yazi">Ayarlar</span>
                 </button>
+                            <button type="button" class="cubuk-ogesi" data-oge="bildirimler" data-ipucu="Bildirimler" aria-label="Bildirimler">
+                    <svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 10a6 6 0 0 1 12 0c0 4.5 1.5 6 2 6.5H4c.5-.5 2-2 2-6.5z"/><path d="M10 19.5a2.2 2.2 0 0 0 4 0"/></svg>
+                    <span class="cubuk-yazi">Bildirimler</span><span class="bildirim-noktasi" data-bildirim-noktasi hidden></span>
+                </button>
             </nav>
 
             <div class="cubuk-alt">
+                <button type="button" class="cubuk-ogesi" data-oge="yardim" data-ipucu="Yardım" aria-label="Yardım">
+                    <svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.6 2.2c-.8.5-1.2 1-1.2 2"/><path d="M12 16.8v.2"/></svg>
+                    <span class="cubuk-yazi">Yardım</span>
+                </button>
                 <!-- Tema anahtarı: yazısı o an geçilecek temayı söyler ("Açık mod" / "Koyu mod"). -->
                 <button type="button" class="cubuk-ogesi" id="tema-anahtari" data-ipucu="Açık mod" aria-label="Açık mod">
                     <svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="7" width="19" height="10" rx="5"/><circle cx="8" cy="12" r="2.4"/></svg>
@@ -89,6 +97,22 @@
                 <h1 class="sayfa-basligi"><span class="simge-karesi"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg></span>Takvim</h1>
                 <span class="bosluk"></span>
                 <button type="button" class="ust-dugme panel-dugmesi" id="panel-dugmesi" aria-controls="yan-panel" aria-expanded="false"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M14.5 4.5v15"/></svg>Panel</button>
+                <!-- Arama: dersler, sınavlar/kalemler ve ders notları (static/arama.js). -->
+                <div class="arama" id="arama" role="search">
+                    <svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+                    <input type="text" id="arama-kutusu" placeholder="Ders, sınav veya not ara…" autocomplete="off" spellcheck="false"
+                           role="combobox" aria-label="Ders, sınav veya not ara" aria-expanded="false" aria-controls="arama-sonuclari" aria-autocomplete="list">
+                    <kbd class="arama-kisayolu" id="arama-kisayolu">⌘K</kbd>
+                    <div class="acilir-kart arama-sonuclari" id="arama-sonuclari" role="listbox" hidden></div>
+                </div>
+                <!-- Zil: gerçek durumdan türetilen bildirimler (static/genel.js). -->
+                <div class="zil-alani">
+                    <button type="button" class="zil" id="zil" aria-label="Bildirimler" aria-haspopup="true" aria-expanded="false" aria-controls="bildirim-karti">
+                        <svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 10a6 6 0 0 1 12 0c0 4.5 1.5 6 2 6.5H4c.5-.5 2-2 2-6.5z"/><path d="M10 19.5a2.2 2.2 0 0 0 4 0"/></svg>
+                        <span class="bildirim-noktasi" data-bildirim-noktasi hidden></span>
+                    </button>
+                    <div class="acilir-kart bildirim-karti" id="bildirim-karti" hidden></div>
+                </div>
                 <!-- Kullanıcı alanı: içeriğini kabuk.js yazar (ad, dönem ve hafta bilgisi). -->
                 <button type="button" class="kullanici-alani" id="kullanici-alani" aria-label="Profil ayarlarını aç">
                     <span class="avatar" id="avatar"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.4 3.6-5.4 7-5.4s6.2 2 7 5.4"/></svg></span>
@@ -159,29 +183,23 @@
 
         </div>
 
-        <!-- SAĞ: panel. Bir kapsayıcıdır: içinde aynı anda tek bir "görünüm" gösterilir.
-             Şimdilik iki görünüm var (boş durum ve ders paneli); ileride yenileri eklenebilir. -->
+        <!-- SAĞ: panel. Bir kapsayıcıdır: içinde aynı anda tek bir "görünüm" gösterilir:
+             ders seçili değilken "Genel bakış" kartları, ders seçilince dersin paneli. -->
         <aside class="yan-panel" id="yan-panel">
 
-            <!-- Görünüm: hiçbir ders seçili değil -->
-            <div class="panel-gorunumu panel-bos" data-gorunum="bos">
-                <span>Bir ders seçmek için takvimde bloğuna tıkla</span>
-                <!-- Ders var ama dönem tarihleri girilmemişse görünür. -->
-                <div class="mesaj uyari donem-uyari-karti" id="donem-uyari-karti" hidden>
-                    Yoklama takibi için dönem tarihlerini gir.
-                    <button type="button" class="baglanti" data-donem-ac>Akademik takvimi aç</button>
-                </div>
-            </div>
+            <!-- Görünüm: Genel bakış (kart yığını; içeriğini static/genel.js çizer) -->
+            <div class="panel-gorunumu genel-bakis" id="genel-bakis" data-gorunum="genel"></div>
 
             <!-- Görünüm: seçili dersin paneli (içeriğini JavaScript doldurur) -->
             <section class="panel-gorunumu ders-paneli" data-gorunum="ders" hidden>
+                <button type="button" class="geri-dugmesi" id="panel-geri"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m11 6-6 6 6 6"/></svg>Genel bakış</button>
                 <header class="panel-baslik">
                     <span class="renk-noktasi" id="panel-renk"></span>
                     <div class="panel-adlar">
                         <h2 id="panel-kod"></h2>
                         <p id="panel-ad"></p>
                     </div>
-                    <button type="button" class="kapat" id="panel-kapat" title="Paneli kapat" aria-label="Paneli kapat">×</button>
+                    <button type="button" class="kapat" id="panel-kapat" title="Genel bakışa dön" aria-label="Genel bakışa dön">×</button>
                 </header>
                 <!-- Kredi, hedef harf notu, devamsızlık hakkı -->
                 <p class="panel-kunye" id="panel-kunye"></p>
@@ -262,6 +280,67 @@
                 <span class="not-durumu" id="profil-durumu"></span>
             </form>
         </section>
+    </dialog>
+
+    <!-- ============================================================
+         YARDIM PENCERESİ. Notlandırma tablosu ve yoklama simgeleri app.py'deki sabitlerden
+         (NOT_OLCEGI, YOKLAMA_DURUMLARI) üretilir; burada ayrı bir kopyaları yoktur.
+         ============================================================ -->
+    <dialog class="pencere yardim-penceresi" id="yardim-penceresi">
+        <header class="pencere-baslik">
+            <h2>Yardım</h2>
+            <button type="button" class="kapat" id="yardim-kapat" aria-label="Kapat">×</button>
+        </header>
+        <div class="yardim-kartlari">
+            <section class="yardim-karti">
+                <h3>Kısayollar</h3>
+                <dl class="etiket-deger">
+                    <div><dt><kbd>⌘B</kbd> / <kbd>Ctrl B</kbd></dt><dd>Sol çubuğu daralt ya da genişlet</dd></div>
+                    <div><dt><kbd>⌘K</kbd> / <kbd>Ctrl K</kbd></dt><dd>Aramaya geç</dd></div>
+                    <div><dt><kbd>Esc</kbd></dt><dd>Açık pencereyi kapat</dd></div>
+                </dl>
+            </section>
+            <section class="yardim-karti">
+                <h3>Takvimdeki simgeler</h3>
+                <dl class="etiket-deger">
+                    {% for durum in yoklama_durumlari %}
+                    <div><dt><span class="yoklama-simgesi ornek">{{ durum.simge }}</span></dt><dd>{{ durum.ad }}</dd></div>
+                    {% endfor %}
+                    <div><dt><span class="yoklama-simgesi ornek bekliyor">?</span></dt><dd>Ders bitti, yoklama girilmedi</dd></div>
+                </dl>
+            </section>
+            <section class="yardim-karti">
+                <h3>Renkler</h3>
+                <dl class="etiket-deger">
+                    <div><dt><span class="hap olumlu">✓ Yeşil</span></dt><dd>Hedefe ulaşıldı / devamsızlıkta güvendesin</dd></div>
+                    <div><dt><span class="hap uyari">! Sarı</span></dt><dd>Dikkat: hedefin altında ya da sınıra yakın</dd></div>
+                    <div><dt><span class="hap tehlike">✗ Kırmızı</span></dt><dd>Devamsızlık hakkı bitti ya da sınır aşıldı</dd></div>
+                </dl>
+            </section>
+            <section class="yardim-karti">
+                <h3>Notlandırma</h3>
+                <table class="panel-tablosu yardim-tablosu">
+                    <thead><tr><th>Harf</th><th>Puan aralığı</th><th>4'lük katsayı</th></tr></thead>
+                    <tbody>
+                        {% for satir in harf_tablosu %}
+                        <tr><td>{{ satir.harf }}</td><td>{{ satir.aralik }}</td><td>{{ satir.katsayi }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <p class="kucuk-not">Ders puanı 100'e kırpılmaz; ekstra puanlar doğrudan toplama eklenir.</p>
+            </section>
+            <section class="yardim-karti genis">
+                <h3>Nasıl çalışır</h3>
+                <ul class="yardim-listesi">
+                    <li><strong>Ders ekleme:</strong> sol çubuktaki “Ders ekle” ile kodu, krediyi, hedef harfi ve ders saatlerini gir.</li>
+                    <li><strong>Syllabus ile ekleme:</strong> PDF ya da görseli yükle; okunan bilgiler forma gelir, kontrol edip kaydedersin.</li>
+                    <li><strong>Yoklama:</strong> biten dersler “Yoklama”da bekler; katıldım, katılmadım, alınmadı ya da iptal olarak işaretle.</li>
+                    <li><strong>Hedef harf ve gereken puan:</strong> takvimde derse tıkla, “Not hesabı”na aldığın puanları yaz; kalan kalemlerden ne gerektiğini görürsün.</li>
+                    <li><strong>Dönem ekranı:</strong> “Akademik takvim”e dönem tarihlerini ve tatilleri, “GPA”ya önceki kredi ve ortalamanı gir.</li>
+                    <li><strong>Genel bakış:</strong> sağdaki kartlar hep kayıtlı verinden hesaplanır; satırlara tıklayınca ilgili yere gidersin.</li>
+                </ul>
+            </section>
+        </div>
     </dialog>
 
     <!-- ============================================================
@@ -670,6 +749,9 @@
     <script src="{{ url_for('static', filename='donem.js') }}"></script>
     <!-- Devamsızlık (yoklama): hesap, yoklama penceresi, takvim simgeleri ve paneldeki sekme. -->
     <script src="{{ url_for('static', filename='yoklama.js') }}"></script>
+    <!-- Genel bakış kartları ve bildirimler; ardından üst çubuktaki arama. -->
+    <script src="{{ url_for('static', filename='genel.js') }}"></script>
+    <script src="{{ url_for('static', filename='arama.js') }}"></script>
     <!-- Kabuk: sol çubuk, üst çubuk, karşılama, pencerelerin açılıp kapanması, tema ve profil. -->
     <script src="{{ url_for('static', filename='kabuk.js') }}"></script>
 </body>

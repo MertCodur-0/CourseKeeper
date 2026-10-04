@@ -9,6 +9,8 @@ let dersler = [];               // sunucudan gelen bütün dersler
 // Devamsızlık için gereken veri: şimdiki zaman, dönem, ders yapılmayan tarihler, yoklama kayıtları.
 // Hesap ve arayüzü static/yoklama.js'tedir.
 let yoklamaVerisi = { simdi: "", donem: null, ders_disi_tarihler: [], kayitlar: [] };
+// Kayıtlı GPA ayarları (önceki kredi/GPA, hedef GPA, kredi birimi). "Genel bakış"taki GPA kartı kullanır.
+let gpaAyarlari = { onceki_kredi: null, onceki_gpa: null, hedef_gpa: null, kredi_birimi: "kredi" };
 let siradakiRenk = null;        // yeni derse önerilecek (kullanılmayan ilk) renk
 let duzenlenenDersId = null;    // formda açık olan dersin kimliği (yeni derste null)
 let okumaNo = 0;                // her syllabus okumasının numarası (pencere kapanınca eski okuma yok sayılır)
@@ -115,14 +117,13 @@ async function istekGonder(yontem, adres, veri) {
 // ============================================================
 
 async function dersleriYukle() {
-    // Dersler ve yoklama verisi birlikte alınır ki takvim ve panel ikisini de aynı anda görsün.
-    const [sonuc, yoklama] = await Promise.all([
-        istekGonder("GET", "/api/dersler"),
-        istekGonder("GET", "/api/yoklama"),
-    ]);
+    // Sayfanın ihtiyaç duyduğu her şey tek bir salt okunur özetten gelir: dersler, dönem,
+    // yoklama kayıtları ve GPA ayarları. Böylece takvim, panel ve kartlar hep aynı veriyi görür.
+    const sonuc = await istekGonder("GET", "/api/ozet");
     dersler = sonuc.dersler;
     siradakiRenk = sonuc.siradaki_renk;
-    yoklamaVerisiniAl(yoklama);
+    gpaAyarlari = sonuc.gpa;
+    yoklamaVerisiniAl(sonuc);
     takvimiCiz();
     paneliYenile();
     yoklamaDurumunuGuncelle();
@@ -512,6 +513,8 @@ function takvimiCiz() {
     izgara.querySelectorAll(".serit").forEach((hucre) => { hucre.hidden = !seritDolu; });
     bloklariSigdir();
     seciliVurguyuGuncelle();
+    // Takvim her yeniden çizildiğinde (veri ya da gösterilen hafta değişti) "Genel bakış" da yenilenir.
+    genelBakisiCiz();
 }
 
 // Gösterilen haftayı değiştirir. kayma: -1 önceki, 1 sonraki, 0 bu haftaya dön.
@@ -987,7 +990,8 @@ izgara.addEventListener("click", (olay) => {
 // ============================================================
 // SAĞ PANEL
 // Panel bir kapsayıcıdır: içinde aynı anda tek bir "görünüm" gösterilir.
-// Şimdilik iki görünüm var: "bos" (ders seçili değil) ve "ders" (seçili dersin paneli).
+// İki görünüm var: "genel" (ders seçili değilken "Genel bakış" kartları; static/genel.js) ve
+// "ders" (seçili dersin paneli).
 // İleride başka görünümler (ör. genel GPA) eklenebilir.
 // ============================================================
 
@@ -1049,12 +1053,12 @@ function dersPaneliniAc(ders, kalemId = null) {
     if (kalemId != null) kalemSatiriniVurgula(kalemId);
 }
 
+// Ders panelini kapatıp "Genel bakış"a döner ("← Genel bakış" ve × düğmeleri).
 function paneliKapat() {
     notKaydiniBitir();
     seciliDersId = null;
-    panelGorunumunuGoster("bos");
+    genelBakisaDon();
     seciliVurguyuGuncelle();
-    panelCekmecesiniKapat();
 }
 
 // Dersler sunucudan yeniden yüklenince çağrılır: paneli yeni veriyle tazeler,
@@ -1065,7 +1069,7 @@ function paneliYenile() {
         clearTimeout(notZamanlayici);
         notZamanlayici = null;
         seciliDersId = null;
-        panelGorunumunuGoster("bos");
+        genelBakisaDon();
         return;
     }
     dersPaneliniCiz(false);
@@ -1086,6 +1090,7 @@ function sekmeyiGoster(ad) {
 // doldurulmaz ki o sırada yazılmakta olan not ezilmesin.)
 function dersPaneliniCiz(notlariYukle) {
     const ders = seciliDers();
+    genelBakisKonumunuSakla();   // geri dönünce "Genel bakış" kaldığı yerden devam etsin
     panelGorunumunuGoster("ders");
 
     document.getElementById("panel-renk").style.background = renkBul(ders.renk).kod;
@@ -1198,7 +1203,7 @@ function notDurumunuHesapla(ders) {
 }
 
 // Sonuç kutusunun alt notunu hazırlar: { baslik, ek: [satırlar], duzenle }
-// Hedefe ulaşıldıysa not yoktur, null döner.
+// Hedefe ulaşıldıysa not yoktur, null döner. (ulasilamaz ve tekKalem işaretlerini "Genel bakış" kullanır.)
 function sonucMesaji(ders, durum) {
     if (ders.degerlendirmeler.length === 0) {
         return { baslik: "Bu derse değerlendirme kalemi eklenmemiş.", ek: ["Kalemleri “Düzenle” ile ekleyebilirsin."], duzenle: true };
@@ -1219,7 +1224,9 @@ function sonucMesaji(ders, durum) {
                 ? "Ekstra puanlarla ulaşılabilir."
                 : "Ekstra puanlarla da ulaşılamıyor.");
         }
-        return { baslik: `Hedef ${hedef.harf} için ${ikiOndalik(gereken, true)} puan eksik.`, ek };
+        // ulasilamaz: kalan ekstra puanlarla da hedefe varılamıyor.
+        return { baslik: `Hedef ${hedef.harf} için ${ikiOndalik(gereken, true)} puan eksik.`, ek,
+                 ulasilamaz: gereken > durum.kalanEkstraPuan };
     }
 
     // Kalan normal kalemlerin hepsinden tam puan alınsa bile yetmiyor.
@@ -1230,7 +1237,7 @@ function sonucMesaji(ders, durum) {
                 ek: [`Ekstra puanları da alırsan kalan kalemlerden toplam en az ${yukariYuvarla(gereken - durum.kalanEkstraPuan)} puan yeterli.`],
             };
         }
-        return { baslik: "Bu hedefe ulaşmak mümkün görünmüyor." };
+        return { baslik: "Bu hedefe ulaşmak mümkün görünmüyor.", ulasilamaz: true };
     }
 
     // Tek kalem kaldı.
@@ -1239,9 +1246,10 @@ function sonucMesaji(ders, durum) {
         const tur = turBul(kalem.tur);
         if (yuzUzerindenMi(kalem)) {
             // Vize/final: gereken puan 100 üzerinden söylenir.
-            return { baslik: `${tur.den_hali} en az ${yukariYuvarla(gereken / kalem.agirlik * 100)} almalısın.` };
+            // tekKalem: tek bir kalem kaldı ("Önerilen işler" bu cümleyi kullanır).
+            return { baslik: `${tur.den_hali} en az ${yukariYuvarla(gereken / kalem.agirlik * 100)} almalısın.`, tekKalem: true };
         }
-        return { baslik: `${tur.ad} için en az ${yukariYuvarla(gereken)} puan gerekiyor (${kalem.agirlik} üzerinden).` };
+        return { baslik: `${tur.ad} için en az ${yukariYuvarla(gereken)} puan gerekiyor (${kalem.agirlik} üzerinden).`, tekKalem: true };
     }
 
     // Birden fazla kalem kaldı: toplam puan olarak söylenir.
@@ -1474,6 +1482,7 @@ function bilgiyiCiz(ders) {
 // ---------- Panel olayları ----------
 
 document.getElementById("panel-kapat").addEventListener("click", paneliKapat);
+document.getElementById("panel-geri").addEventListener("click", paneliKapat);
 document.getElementById("bilgi-duzenle").addEventListener("click", () => {
     if (seciliDers()) dersFormunuAc(seciliDers());
 });

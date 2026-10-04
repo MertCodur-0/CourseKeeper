@@ -198,12 +198,10 @@ async function yoklamayiKaydet(kayitlar, hataYeri) {
 // ============================================================
 
 // Dersler ya da yoklama verisi yenilenince çağrılır: sol çubuktaki rozeti, üstteki dönem bilgisini ve
-// boş paneldeki dönem uyarısını günceller; sayfa açılışında bekleyen varsa pencereyi (bir kez) açar.
+// karşılamayı günceller; sayfa açılışında bekleyen varsa pencereyi (bir kez) açar.
 function yoklamaDurumunuGuncelle() {
     const bekleyenSayisi = bekleyenYoklamalar().length;
     kabukBilgisiniGuncelle(bekleyenSayisi);
-    // Dönem girilmemişse ve en az bir ders varsa boş paneldeki uyarı kartı görünür.
-    document.getElementById("donem-uyari-karti").hidden = yoklamaVerisi.donem !== null || dersler.length === 0;
 
     if (!acilistaGosterildi) {
         acilistaGosterildi = true;
@@ -215,11 +213,16 @@ function yoklamaDurumunuGuncelle() {
 // Pencereyi kendiliğinden açmaz, takvimi ve paneli yeniden çizmez.
 async function bekleyenleriYenile() {
     try {
-        yoklamaVerisiniAl(await istekGonder("GET", "/api/yoklama"));
+        // Özetin tamamı alınır; dersler değiştirilmez (o sırada panelde yazılıyor olabilir),
+        // sadece zamana bağlı veriler (şimdi, dönem, yoklama, GPA ayarları) tazelenir.
+        const ozet = await istekGonder("GET", "/api/ozet");
+        gpaAyarlari = ozet.gpa;
+        yoklamaVerisiniAl(ozet);
     } catch {
         return;   // sunucu kapalıysa sessizce geç; bir sonraki denemede düzelir
     }
     kabukBilgisiniGuncelle(bekleyenYoklamalar().length);
+    genelBakisiCiz();   // kartlar ve bildirimler de yeni zamana göre güncellenir
 }
 
 // ============================================================
@@ -491,7 +494,7 @@ document.getElementById("yoklama-sonra").addEventListener("click", () => yoklama
 document.getElementById("yoklama-tumu-katildi").addEventListener("click", () => tumunuIsaretle("katildi"));
 document.getElementById("yoklama-tumu-alinmadi").addEventListener("click", () => tumunuIsaretle("alinmadi"));
 
-// "Akademik takvimi aç" bağlantıları (boş paneldeki uyarı kartı ve Devamsızlık sekmesi):
+// "Akademik takvimi aç" bağlantısı (Devamsızlık sekmesi):
 // Dönem ekranı "Akademik takvim" sekmesinde açılır.
 document.getElementById("yan-panel").addEventListener("click", (olay) => {
     if (olay.target.closest("[data-donem-ac]")) donemEkraniniAc();

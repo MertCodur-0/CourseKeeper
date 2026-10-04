@@ -87,7 +87,8 @@ const yoklamaPenceresiEl = document.getElementById("yoklama-penceresi");
 const dersPenceresiEl = document.getElementById("ders-penceresi");
 const donemPenceresiEl = document.getElementById("donem-penceresi");
 const ayarlarPenceresi = document.getElementById("ayarlar-penceresi");
-const ANA_PENCERELER = [yoklamaPenceresiEl, dersPenceresiEl, donemPenceresiEl, ayarlarPenceresi];
+const yardimPenceresi = document.getElementById("yardim-penceresi");
+const ANA_PENCERELER = [yoklamaPenceresiEl, dersPenceresiEl, donemPenceresiEl, ayarlarPenceresi, yardimPenceresi];
 let ayarlarBolumu = "ayarlar";   // Ayarlar penceresi hangi öğeden açıldı: "ayarlar" ya da "profil"
 
 // O an açık olan ana pencere (yoksa null).
@@ -107,6 +108,7 @@ function aktifOge() {
     if (acik === yoklamaPenceresiEl) return "yoklama";
     if (acik === dersPenceresiEl) return "ders";
     if (acik === ayarlarPenceresi) return ayarlarBolumu;
+    if (acik === yardimPenceresi) return "yardim";
     if (acik === donemPenceresiEl) {
         return document.querySelector("#donem-sekmeleri .secili")?.dataset.sekme === "gpa" ? "gpa" : "akademik";
     }
@@ -181,6 +183,7 @@ function ayarlarPenceresiniAc(bolum) {
 }
 
 document.getElementById("ayarlar-kapat").addEventListener("click", () => ayarlarPenceresi.close());
+document.getElementById("yardim-kapat").addEventListener("click", () => yardimPenceresi.close());
 document.getElementById("profil-formu").addEventListener("submit", (olay) => {
     olay.preventDefault();
     tercihYaz(AD_TERCIHI, profilAdi.value.trim().slice(0, 30));
@@ -190,7 +193,7 @@ document.getElementById("profil-formu").addEventListener("submit", (olay) => {
 
 // ============================================================
 // SOL KENAR ÇUBUĞU
-// Öğeler: ders (Ders ekle), takvim, yoklama, akademik, gpa, ayarlar, profil. Yeni bir ana eylem
+// Öğeler: ders (Ders ekle), takvim, yoklama, akademik, gpa, ayarlar, bildirimler, yardim, profil. Yeni bir ana eylem
 // eklemek için: index.html'e bir öğe, aktifOge()'ye penceresi, OGE_EYLEMLERI'ne açan fonksiyon.
 // ============================================================
 
@@ -206,6 +209,7 @@ const OGE_EYLEMLERI = {
     gpa: () => donemEkraniniAc("gpa"),
     ayarlar: () => ayarlarPenceresiniAc("ayarlar"),
     profil: () => ayarlarPenceresiniAc("profil"),
+    yardim: () => pencereyiAc(yardimPenceresi),
 };
 
 // Çubuğu daraltır ya da genişletir; durumu saklar. Takvim sütunları yeni genişliğe kendiliğinden uyar.
@@ -232,6 +236,12 @@ cubukDugmesiniGuncelle();
 // Bir öğeye basılınca: açık pencere varsa önce o kapanır (kaydedilmemiş değişiklikte onay sorulur;
 // vazgeçilirse hiçbir şey değişmez). "Takvim" ya da zaten açık olan pencerenin öğesi sadece kapatır.
 function cubukOgesineBasildi(ad) {
+    // "Bildirimler" bir pencere değil: üst çubuktaki zilin altındaki kartı açar/kapatır.
+    // (Açık pencere varsa önce o kapanır; çünkü kart, pencere açıkken kilitli olan içerik alanındadır.)
+    if (ad === "bildirimler") {
+        if (acikPencereyiKapat()) bildirimKartiniAcKapat();
+        return;
+    }
     const aktif = aktifOge();
     // Aynı pencerenin diğer bölümü: pencere kapanmadan sekme/bölüm değişir.
     if (donemPenceresiEl.open && (ad === "akademik" || ad === "gpa") && ad !== aktif) {
@@ -321,9 +331,11 @@ document.addEventListener("keydown", (olay) => {
         return;
     }
     if (olay.key !== "Escape") return;
-    // Esc sırayla: açık çekmece, üstteki küçük pencere, açık ana pencere.
+    // Esc sırayla: bildirim kartı, açık çekmece, üstteki küçük pencere, açık ana pencere.
     const kok = document.documentElement.dataset;
-    if (kok.cekmece === "acik" || kok.panel === "acik") {
+    if (bildirimKartiniKapat()) {
+        // kapandı
+    } else if (kok.cekmece === "acik" || kok.panel === "acik") {
         cekmeceyiKapat();
         panelCekmecesiniKapat();
     } else if (acikUstPencere()) {
