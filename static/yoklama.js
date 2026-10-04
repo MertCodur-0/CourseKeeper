@@ -3,13 +3,18 @@
 // istekGonder, mesajGoster, eleman, renkBul, ikiOndalik, saatiSayiyaCevir, gunNumarasi, tarihiGoster,
 // takvimiCiz, seciliDers, donemEkraniniAc).
 //
-// Ayarlar app.py'de tek yerde: ATTENDANCE_UNIT, LIMIT_ROUNDING, uyarı eşiği, YOKLAMA_DURUMLARI.
+// Yoklama saat saat tutulur: her kayıt bir oturumun belirli bir tarihteki bir saatlik DİLİMİ içindir
+// (dilimin kimliği başlangıç saatidir, ör. "09:00"). Oturumun saati sonradan değişirse eski saatlerin
+// kayıtları silinmez ama hesaba katılmaz; yeni saatler "kaydı yok" sayılır.
+//
+// Ayarlar app.py'de tek yerde: LIMIT_ROUNDING, uyarı eşiği, YOKLAMA_DURUMLARI, KARISIK_SIMGESI.
 
 // ============================================================
 // DURUM ve SAYFADAKİ PARÇALAR
 // ============================================================
 
-let yoklamaKayitlari = new Map();   // "oturum kimliği|tarih" -> durum
+let yoklamaKayitlari = new Map();   // "oturum kimliği|tarih|dilim" -> durum
+let saatSaatTercihi = new Map();    // "oturum kimliği|tarih" -> "Saat saat" bölümünü kullanıcı açtı mı (true/false)
 let dersDisiGunler = new Set();     // ders yapılmayan günlerin gün numaraları
 let pencereListesi = [];            // yoklama penceresinde gösterilen oturumlar (açıldığı andaki bekleyenler)
 let acilistaGosterildi = false;     // pencere sayfa açılışı başına bir kez kendiliğinden açılır
@@ -33,7 +38,8 @@ const devamsizlikIcerigi = document.getElementById("devamsizlik-icerigi");
 // Sunucudan gelen yoklama verisini alır ve hızlı arama için hazırlar.
 function yoklamaVerisiniAl(veri) {
     yoklamaVerisi = veri;
-    yoklamaKayitlari = new Map(veri.kayitlar.map((kayit) => [`${kayit.oturum_id}|${kayit.tarih}`, kayit.durum]));
+    yoklamaKayitlari = new Map(veri.kayitlar.map((kayit) => (
+        [`${kayit.oturum_id}|${kayit.tarih}|${kayit.dilim}`, kayit.durum])));
     // Ders yapılmayan günler: türü ne olursa olsun (tatil, sınav dönemi, diğer) hepsi aynı sayılır.
     dersDisiGunler = new Set();
     for (const aralik of veri.ders_disi_tarihler) {
@@ -72,38 +78,84 @@ function oturumPlanliMi(oturum, tarih) {
     return haftaninGunu(tarih) === oturum.gun && planlananTarihler(oturum).includes(tarih);
 }
 
-// Oturumun devamsızlık birimi: ATTENDANCE_UNIT "hour" ise süresi (saat), "session" ise 1.
-function oturumBirimi(oturum) {
-    if (AYARLAR.yoklamaBirimi !== "hour") return 1;
-    return saatiSayiyaCevir(oturum.bitis) - saatiSayiyaCevir(oturum.baslangic);
+// 9.5 -> "09:30"
+function saatDakikaYazisi(saat) {
+    const dakika = Math.round(saat * 60);
+    return `${String(Math.floor(dakika / 60)).padStart(2, "0")}:${String(dakika % 60).padStart(2, "0")}`;
 }
 
+// Oturumun bir saatlik dilimleri: 09:00-11:00 -> [{09:00, 10:00}, {10:00, 11:00}].
+// Süre tam saat değilse dilim sayısı yukarı yuvarlanır; en az bir dilim vardır (app.py: oturum_dilimleri).
+function oturumDilimleri(oturum) {
+    const ilk = saatiSayiyaCevir(oturum.baslangic);
+    const sayi = Math.max(1, Math.ceil(saatiSayiyaCevir(oturum.bitis) - ilk - 1e-9));
+    const dilimler = [];
+    for (let sira = 0; sira < sayi; sira++) {
+        dilimler.push({
+            baslangic: saatDakikaYazisi(ilk + sira),
+            bitis: sira === sayi - 1 ? oturum.bitis : saatDakikaYazisi(ilk + sira + 1),
+        });
+    }
+    return dilimler;
+}
+
+// Devamsızlık birimi: ders saati (her dilim 1 saat).
 function birimAdi() {
-    return AYARLAR.yoklamaBirimi === "hour" ? "saat" : "oturum";
+    return "saat";
 }
 
-// Oturumun o günkü dersi bitti mi? ("Şimdi" sunucudan gelir: Mac'in yerel saati.)
+// Oturumun o günkü dersi (son dilimiyle birlikte) bitti mi? ("Şimdi" sunucudan gelir: Mac'in yerel saati.)
 function dersBittiMi(oturum, tarih) {
     return `${tarih}T${oturum.bitis}` <= yoklamaVerisi.simdi;
 }
 
-function yoklamaDurumu(oturumId, tarih) {
-    return yoklamaKayitlari.get(`${oturumId}|${tarih}`) || null;
+function dilimBittiMi(dilim, tarih) {
+    return `${tarih}T${dilim.bitis}` <= yoklamaVerisi.simdi;
 }
 
-// Oturumun toplam yoklama kaydı sayısı (oturum silinirken onay mesajı için).
+function dilimDurumu(oturumId, tarih, dilimBaslangici) {
+    return yoklamaKayitlari.get(`${oturumId}|${tarih}|${dilimBaslangici}`) || null;
+}
+
+// Oturumun o tarihteki yoklaması, dilim dilim:
+//   dilimler : [{baslangic, bitis, durum}] (kaydı olmayan dilimin durumu null)
+//   eksik    : kaydı olmayan dilim sayısı
+//   ortak    : bütün dilimlerin kaydı var ve hepsi aynıysa o durum, değilse null
+//   karisik  : kayıtlı dilimler arasında farklı durumlar var mı
+function oturumYoklamasi(oturum, tarih) {
+    const dilimler = oturumDilimleri(oturum).map((dilim) => (
+        { ...dilim, durum: dilimDurumu(oturum.id, tarih, dilim.baslangic) }));
+    const kayitlilar = dilimler.filter((dilim) => dilim.durum).map((dilim) => dilim.durum);
+    const eksik = dilimler.length - kayitlilar.length;
+    const cesit = new Set(kayitlilar).size;
+    return { dilimler, eksik, ortak: eksik === 0 && cesit === 1 ? kayitlilar[0] : null, karisik: cesit > 1 };
+}
+
+function durumBul(anahtar) {
+    return AYARLAR.yoklamaDurumlari.find((durum) => durum.anahtar === anahtar);
+}
+
+// Dilimlerin kısa özeti. Saatli: "09:00 katıldı · 10:00 katılmadı"; değilse "1. saat katıldı · 2. saat katılmadı".
+function dilimOzeti(yoklama, saatli) {
+    return yoklama.dilimler.map((dilim, sira) => (
+        `${saatli ? dilim.baslangic : `${sira + 1}. saat`} ${dilim.durum ? durumBul(dilim.durum).ozet : "girilmedi"}`
+    )).join(" · ");
+}
+
+// Oturumun toplam (saatlik) yoklama kaydı sayısı (oturum silinirken onay mesajı için).
 function yoklamaKayitSayisi(oturumId) {
     return yoklamaVerisi.kayitlar.filter((kayit) => kayit.oturum_id === oturumId).length;
 }
 
-// Bekleyenler: dersi bitmiş ama yoklaması hiç girilmemiş planlanan oturumlar.
+// Bekleyenler: dersi bitmiş ama en az bir saatinin yoklaması girilmemiş planlanan oturumlar
+// (kısmen doldurulmuş oturum, tamamlanana kadar bekler).
 // En yeni gün üstte (önce bugün), aynı gün içinde saat sırasıyla.
 function bekleyenYoklamalar() {
     const bekleyenler = [];
     for (const ders of dersler) {
         for (const oturum of ders.oturumlar) {
             for (const tarih of planlananTarihler(oturum)) {
-                if (dersBittiMi(oturum, tarih) && !yoklamaDurumu(oturum.id, tarih)) {
+                if (dersBittiMi(oturum, tarih) && oturumYoklamasi(oturum, tarih).eksik > 0) {
                     bekleyenler.push({ ders, oturum, tarih });
                 }
             }
@@ -121,6 +173,7 @@ function limitHesapla(toplam, yuzde) {
 
 // Dersin devamsızlık durumu. Havuzlar: lab hakkı dolu VE lab oturumu varsa "Teori" ve "Lab" ayrı;
 // aksi halde tek havuz "Toplam". Her havuz için bütün sayaçlar burada, tek yerde hesaplanır.
+// Birim dilimdir (1 saat): her dilim kendi durumuyla sayılır.
 function dersYoklamasi(ders) {
     const labOturumlari = ders.oturumlar.filter((oturum) => oturum.tur === "lab");
     let havuzlar;
@@ -136,18 +189,20 @@ function dersYoklamasi(ders) {
     for (const havuz of havuzlar) {
         Object.assign(havuz, { toplam: 0, gidilen: 0, gidilmeyen: 0, alinmadi: 0, iptal: 0, gecen: 0 });
         for (const oturum of havuz.oturumlar) {
-            const birim = oturumBirimi(oturum);
+            const dilimler = oturumDilimleri(oturum);
             for (const tarih of planlananTarihler(oturum)) {
-                const durum = yoklamaDurumu(oturum.id, tarih);
-                if (durum === "iptal") {
-                    havuz.iptal += birim;   // iptal edilen ders dönem toplamından düşer
-                    continue;
+                for (const dilim of dilimler) {
+                    const durum = dilimDurumu(oturum.id, tarih, dilim.baslangic);
+                    if (durum === "iptal") {
+                        havuz.iptal += 1;   // iptal edilen saat dönem toplamından düşer
+                        continue;
+                    }
+                    havuz.toplam += 1;      // "alınmadı" olanlar toplamda kalır
+                    if (dilimBittiMi(dilim, tarih)) havuz.gecen += 1;
+                    if (durum === "katildi") havuz.gidilen += 1;
+                    else if (durum === "katilmadi") havuz.gidilmeyen += 1;
+                    else if (durum === "alinmadi") havuz.alinmadi += 1;
                 }
-                havuz.toplam += birim;      // "alınmadı" olanlar toplamda kalır
-                if (dersBittiMi(oturum, tarih)) havuz.gecen += birim;
-                if (durum === "katildi") havuz.gidilen += birim;
-                else if (durum === "katilmadi") havuz.gidilmeyen += birim;
-                else if (durum === "alinmadi") havuz.alinmadi += birim;
             }
         }
         havuz.kalanDers = havuz.toplam - havuz.gecen;
@@ -171,26 +226,40 @@ function dersYoklamasi(ders) {
 // KAYDETME
 // ============================================================
 
-// Yoklama kayıtlarını ([{oturum_id, tarih, durum}]) sunucuya yazar; başarılıysa eldeki veriyi ve
+// Yoklama kayıtlarını ([{oturum_id, tarih, dilim, durum}]) sunucuya yazar; başarılıysa eldeki veriyi ve
 // ekranı (takvim simgeleri, panel, sol çubuktaki rozet, açık pencere) günceller. Başarısızsa false döner.
-async function yoklamayiKaydet(kayitlar, hataYeri) {
+// sadeceBos: toplu düğmeler için; sunucu mevcut kayıtların üstüne yazmaz.
+async function yoklamayiKaydet(kayitlar, hataYeri, sadeceBos = false) {
     try {
-        await istekGonder("PUT", "/api/yoklama", { kayitlar });
+        await istekGonder("PUT", "/api/yoklama", { kayitlar, sadece_bos: sadeceBos });
     } catch (hata) {
         mesajGoster(hataYeri, hata.message);
         return false;
     }
     mesajGoster(hataYeri, "");
     for (const kayit of kayitlar) {
-        const mevcut = yoklamaVerisi.kayitlar.find((k) => k.oturum_id === kayit.oturum_id && k.tarih === kayit.tarih);
+        const mevcut = yoklamaVerisi.kayitlar.find((k) => (
+            k.oturum_id === kayit.oturum_id && k.tarih === kayit.tarih && k.dilim === kayit.dilim));
+        if (mevcut && sadeceBos) continue;
         if (mevcut) mevcut.durum = kayit.durum;
         else yoklamaVerisi.kayitlar.push({ ...kayit });
-        yoklamaKayitlari.set(`${kayit.oturum_id}|${kayit.tarih}`, kayit.durum);
+        yoklamaKayitlari.set(`${kayit.oturum_id}|${kayit.tarih}|${kayit.dilim}`, kayit.durum);
     }
     takvimiCiz();
     if (seciliDers()) devamsizligiCiz(seciliDers());
     yoklamaDurumunuGuncelle();
     return true;
+}
+
+// Verilen oturum-tarih satırlarının KAYDI OLMAYAN dilimleri için kayıt listesi (toplu düğmeler).
+function bosDilimKayitlari(satirlar, durum) {
+    const kayitlar = [];
+    for (const { oturum, tarih } of satirlar) {
+        for (const dilim of oturumYoklamasi(oturum, tarih).dilimler) {
+            if (!dilim.durum) kayitlar.push({ oturum_id: oturum.id, tarih, dilim: dilim.baslangic, durum });
+        }
+    }
+    return kayitlar;
 }
 
 // ============================================================
@@ -241,12 +310,16 @@ function yoklamaPenceresiniAc() {
     pencereyiAc(yoklamaPenceresi);
 }
 
-// Dört durumlu seçici. yazili: düğmelerde durumun adı mı (pencere) yoksa sadece simgesi mi (panel)?
-function durumSecici(oturum, tarih, yazili, hataYeri) {
-    const secici = eleman("div", "durum-secici");
-    const secili = yoklamaDurumu(oturum.id, tarih);
+// Dört durumlu seçici: basınca verilen dilimlerin HEPSİNE o durumu yazar.
+//   dilimler : oturumun bütün dilimleri (oturum seviyesi) ya da tek dilim ("Saat saat" satırı)
+//   secili   : vurgulanacak durum (yoksa null)
+//   yazim    : "ad" düğmede durumun adı (pencere), "simge" sadece simge (panel),
+//              "kisa" simge + kısa ad (dar yerde yazı gizlenir, ipucu kalır)
+function durumSecici(oturum, tarih, dilimler, secili, yazim, hataYeri) {
+    const secici = eleman("div", `durum-secici${yazim === "ad" ? "" : " kucuk"}`);
     for (const durum of AYARLAR.yoklamaDurumlari) {
-        const dugme = eleman("button", "", yazili ? durum.ad : durum.simge);
+        const dugme = eleman("button", "", yazim === "ad" ? durum.ad : durum.simge);
+        if (yazim === "kisa") dugme.appendChild(eleman("span", "kisa-ad", durum.kisa));
         dugme.type = "button";
         dugme.title = durum.ad;
         dugme.setAttribute("aria-label", durum.ad);
@@ -254,7 +327,8 @@ function durumSecici(oturum, tarih, yazili, hataYeri) {
         dugme.classList.toggle("secili", durum.anahtar === secili);
         // Basınca hemen kaydedilir; yanlışsa başka bir duruma basarak değiştirilebilir.
         dugme.addEventListener("click", () => {
-            yoklamayiKaydet([{ oturum_id: oturum.id, tarih, durum: durum.anahtar }], hataYeri)
+            yoklamayiKaydet(dilimler.map((dilim) => (
+                { oturum_id: oturum.id, tarih, dilim: dilim.baslangic, durum: durum.anahtar })), hataYeri)
                 .then(pencereyiYenile);
         });
         secici.appendChild(dugme);
@@ -262,17 +336,68 @@ function durumSecici(oturum, tarih, yazili, hataYeri) {
     return secici;
 }
 
+// Bir oturum-tarih satırının yoklama parçaları (pencere ve "Geçmiş oturumlar" ortak kullanır):
+//   secici : oturum seviyesinde 4 düğme; tüm dilimlere yazar, ancak dilimlerin hepsi aynıysa vurguludur
+//   ok     : "Saat saat" bölümünü açıp kapatan düğme (tek saatlik oturumda yok)
+//   bolum  : her dilim için saat aralığı ve küçük seçici (tek saatlik oturumda yok)
+//   rozet, ozet : dilimler farklı işaretliyse "Karışık" rozeti ve "1. saat katıldı · 2. saat katılmadı"
+function yoklamaParcalari(oturum, tarih, pencerede, hataYeri) {
+    const yoklama = oturumYoklamasi(oturum, tarih);
+    const parcalar = {
+        secici: durumSecici(oturum, tarih, yoklama.dilimler, yoklama.ortak, pencerede ? "ad" : "simge", hataYeri),
+    };
+    if (yoklama.dilimler.length < 2) return parcalar;
+
+    // Varsayılan kapalı; dilimler farklıysa ya da oturum yarım doldurulduysa kendiliğinden açık.
+    // Kullanıcı elle açıp kapattıysa onun tercihi geçerlidir.
+    const anahtar = `${oturum.id}|${tarih}`;
+    const yarim = yoklama.eksik > 0 && yoklama.eksik < yoklama.dilimler.length;
+    const acik = saatSaatTercihi.has(anahtar) ? saatSaatTercihi.get(anahtar) : (yoklama.karisik || yarim);
+
+    const bolum = eleman("div", "saat-saat");
+    bolum.hidden = !acik;
+    for (const dilim of yoklama.dilimler) {
+        const satir = eleman("div", "dilim-satiri");
+        satir.append(eleman("span", "dilim-saati", `${dilim.baslangic} – ${dilim.bitis}`),
+            durumSecici(oturum, tarih, [dilim], dilim.durum, pencerede ? "kisa" : "simge", hataYeri));
+        bolum.appendChild(satir);
+    }
+
+    const ok = eleman("button", "saat-saat-dugmesi");
+    ok.type = "button";
+    ok.title = "Saat saat işaretle";
+    ok.setAttribute("aria-label", "Saat saat işaretle");
+    ok.setAttribute("aria-expanded", String(acik));
+    if (pencerede) ok.appendChild(eleman("span", "", "Saat saat"));
+    ok.appendChild(eleman("span", "ok"));   // ok işareti CSS ile çizilir
+    ok.addEventListener("click", () => {
+        bolum.hidden = !bolum.hidden;
+        saatSaatTercihi.set(anahtar, !bolum.hidden);
+        ok.setAttribute("aria-expanded", String(!bolum.hidden));
+    });
+
+    Object.assign(parcalar, { ok, bolum });
+    if (yoklama.karisik) {
+        parcalar.rozet = eleman("span", "hap uyari", "Karışık");
+        parcalar.ozet = eleman("small", "dilim-ozeti", dilimOzeti(yoklama, false));
+    }
+    return parcalar;
+}
+
+// Listedeki oturumlardan hâlâ bekleyenlerin (en az bir saati girilmemiş) sayısı.
+function penceredeKalan() {
+    return pencereListesi.filter((satir) => oturumYoklamasi(satir.oturum, satir.tarih).eksik > 0).length;
+}
+
 // Pencere açıksa yeniden çizer; listedeki her oturum doldurulduysa kendiliğinden kapatır.
 function pencereyiYenile() {
     if (!yoklamaPenceresi.open) return;
     yoklamaPenceresiniCiz();
-    const kalan = pencereListesi.filter((satir) => !yoklamaDurumu(satir.oturum.id, satir.tarih)).length;
-    if (kalan === 0) yoklamaPenceresi.close();
+    if (penceredeKalan() === 0) yoklamaPenceresi.close();
 }
 
 function yoklamaPenceresiniCiz() {
-    const kalan = pencereListesi.filter((satir) => !yoklamaDurumu(satir.oturum.id, satir.tarih)).length;
-    document.getElementById("yoklama-basligi").textContent = `Bekleyen yoklamalar (${kalan})`;
+    document.getElementById("yoklama-basligi").textContent = `Bekleyen yoklamalar (${penceredeKalan()})`;
     const bugun = yoklamaVerisi.simdi.slice(0, 10);
 
     // Liste boşsa toplu işlem düğmeleri yerine "Bekleyen yoklama yok" notu görünür.
@@ -288,11 +413,12 @@ function yoklamaPenceresiniCiz() {
         const gununSatirlari = pencereListesi.filter((satir) => satir.tarih === tarih);
         const grup = eleman("section", "yoklama-grubu");
         const baslik = eleman("h3", "", gunBasligi(tarih) + (tarih === bugun ? " · Bugün" : ""));
+        // O günün girilmemiş saatlerini "katıldım" yapar; girilmiş olanlara dokunmaz.
         const hepsi = eleman("button", "baglanti", "Hepsi katıldım");
         hepsi.type = "button";
         hepsi.addEventListener("click", () => {
-            yoklamayiKaydet(gununSatirlari.map((satir) => (
-                { oturum_id: satir.oturum.id, tarih, durum: "katildi" })), yoklamaHatasi).then(pencereyiYenile);
+            const kayitlar = bosDilimKayitlari(gununSatirlari, "katildi");
+            if (kayitlar.length > 0) yoklamayiKaydet(kayitlar, yoklamaHatasi, true).then(pencereyiYenile);
         });
         baslik.appendChild(hepsi);
         grup.appendChild(baslik);
@@ -306,7 +432,10 @@ function yoklamaPenceresiniCiz() {
             const ayrinti = [`${oturum.baslangic}-${oturum.bitis}`, oturum.derslik];
             if (oturum.tur) ayrinti.push(oturum.tur);
             bilgi.appendChild(eleman("small", "", " · " + ayrinti.join(" · ")));
-            satir.append(nokta, bilgi, durumSecici(oturum, tarih, true, yoklamaHatasi));
+            const parcalar = yoklamaParcalari(oturum, tarih, true, yoklamaHatasi);
+            if (parcalar.rozet) bilgi.append(" ", parcalar.rozet, parcalar.ozet);
+            satir.append(nokta, bilgi, parcalar.secici);
+            if (parcalar.ok) satir.append(parcalar.ok, parcalar.bolum);
             grup.appendChild(satir);
         }
         yoklamaListesi.appendChild(grup);
@@ -314,14 +443,15 @@ function yoklamaPenceresiniCiz() {
     yoklamaListesi.scrollTop = kaydirma;
 }
 
-// Penceredeki bütün oturumları verilen duruma getirir (onay ister).
+// Penceredeki oturumların girilmemiş bütün saatlerini verilen duruma getirir (onay ister).
+// Girilmiş kayıtların üstüne yazmaz.
 function tumunuIsaretle(durum) {
-    const degisecekler = pencereListesi.filter((satir) => yoklamaDurumu(satir.oturum.id, satir.tarih) !== durum);
-    if (degisecekler.length === 0) return;
-    const durumAdi = AYARLAR.yoklamaDurumlari.find((d) => d.anahtar === durum).ad;
-    if (!confirm(`${degisecekler.length} kayıt değiştirilecek: hepsi “${durumAdi}” olacak. Devam edilsin mi?`)) return;
-    yoklamayiKaydet(degisecekler.map((satir) => (
-        { oturum_id: satir.oturum.id, tarih: satir.tarih, durum })), yoklamaHatasi).then(pencereyiYenile);
+    const kayitlar = bosDilimKayitlari(pencereListesi, durum);
+    if (kayitlar.length === 0) return;
+    const onay = confirm(`${kayitlar.length} saatlik kayıt yazılacak: girilmemiş saatlerin hepsi `
+        + `“${durumBul(durum).ad}” olacak, girilmiş kayıtlar değişmeyecek. Devam edilsin mi?`);
+    if (!onay) return;
+    yoklamayiKaydet(kayitlar, yoklamaHatasi, true).then(pencereyiYenile);
 }
 
 // ============================================================
@@ -329,19 +459,29 @@ function tumunuIsaretle(durum) {
 // ============================================================
 
 // Ders bloğunun sol üst köşesine o günün yoklama durumunu gösteren küçük simgeyi ekler.
-// Kayıt varsa durumun simgesi; kaydı olmayan geçmiş oturumda sarı "?"; gelecekte simge yok.
+//   bütün saatler aynı durumda          : o durumun simgesi (hepsi iptalse blok yarı saydam)
+//   ders bitmiş, girilmemiş saat var    : sarı "?"
+//   saatler farklı işaretli             : "◐", ipucunda saat saat durum
+//   hiç kayıt yok ve ders bitmemiş      : simge yok
 // (Simge çekirdek alanın sol üstünde durur: sağ üstteki "⋯" butonuyla çakışmaz, yazıyı kaydırmaz.)
 function yoklamaSimgesiEkle(blok, cekirdek, oturum, tarih) {
     if (!oturumPlanliMi(oturum, tarih)) return;
-    const durum = AYARLAR.yoklamaDurumlari.find((d) => d.anahtar === yoklamaDurumu(oturum.id, tarih));
+    const yoklama = oturumYoklamasi(oturum, tarih);
+    const cokDilimli = yoklama.dilimler.length > 1;
     let simge;
-    if (durum) {
+    if (yoklama.ortak) {
+        const durum = durumBul(yoklama.ortak);
         simge = eleman("span", "yoklama-simgesi", durum.simge);
         simge.title = `Yoklama: ${durum.ad}`;
         if (durum.anahtar === "iptal") blok.classList.add("iptal");
-    } else if (dersBittiMi(oturum, tarih)) {
+    } else if (dersBittiMi(oturum, tarih) && yoklama.eksik > 0) {
         simge = eleman("span", "yoklama-simgesi bekliyor", "?");
-        simge.title = "Yoklama girilmedi";
+        // Yarım doldurulmuşsa hangi saatin eksik olduğu ipucunda yazar.
+        simge.title = yoklama.eksik < yoklama.dilimler.length
+            ? `Yoklama eksik: ${dilimOzeti(yoklama, true)}` : "Yoklama girilmedi";
+    } else if (cokDilimli && yoklama.eksik < yoklama.dilimler.length) {
+        simge = eleman("span", "yoklama-simgesi", AYARLAR.karisikSimgesi);
+        simge.title = `Yoklama: ${dilimOzeti(yoklama, true)}`;
     } else {
         return;
     }
@@ -448,7 +588,8 @@ function devamsizligiCiz(ders) {
     }
     for (const havuz of dersYoklamasi(ders)) devamsizlikIcerigi.appendChild(havuzKarti(havuz));
 
-    // Geçmiş oturumlar: dersi bitmiş planlanan oturumlar, en yeni üstte. Buradan değiştirilebilir.
+    // Geçmiş oturumlar: dersi bitmiş planlanan oturumlar, en yeni üstte. Buradan değiştirilebilir;
+    // 2+ saatlik oturum ok düğmesiyle genişler ve saat saat işaretlenebilir.
     const gecmis = [];
     for (const oturum of ders.oturumlar) {
         for (const tarih of planlananTarihler(oturum)) {
@@ -465,7 +606,10 @@ function devamsizligiCiz(ders) {
             const satir = eleman("div", "gecmis-satiri");
             const bilgi = eleman("div", "", tarihiGoster(tarih));
             bilgi.appendChild(eleman("small", "", [`${oturum.baslangic}-${oturum.bitis}`, oturum.tur].filter(Boolean).join(" · ")));
-            satir.append(bilgi, durumSecici(oturum, tarih, false, hataYeri));
+            const parcalar = yoklamaParcalari(oturum, tarih, false, hataYeri);
+            if (parcalar.rozet) bilgi.append(parcalar.rozet, parcalar.ozet);
+            satir.append(bilgi, parcalar.secici);
+            if (parcalar.ok) satir.append(parcalar.ok, parcalar.bolum);
             bolum.appendChild(satir);
         }
         bolum.appendChild(hataYeri);

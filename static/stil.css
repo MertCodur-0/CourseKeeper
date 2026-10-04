@@ -2115,6 +2115,104 @@ body {
     font-weight: 700;
 }
 
+/* ---------- "Saat saat": 2+ saatlik oturumda her saatin ayrı işaretlendiği açılır bölüm ---------- */
+
+/* Bölümü açıp kapatan küçük ok düğmesi */
+.saat-saat-dugmesi {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 7px;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    background: none;
+    color: var(--soluk-yazi);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.saat-saat-dugmesi:hover {
+    border-color: var(--cerceve);
+    color: var(--baslik-rengi);
+}
+
+/* Ok işareti: iki kenarlı küçük kare; kapalıyken aşağı, açıkken yukarı bakar. */
+.saat-saat-dugmesi .ok {
+    width: 6px;
+    height: 6px;
+    margin: 0 2px 3px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg);
+    transition: transform var(--gecis);
+}
+
+.saat-saat-dugmesi[aria-expanded="true"] .ok {
+    margin-bottom: -3px;
+    transform: rotate(-135deg);
+}
+
+.saat-saat {
+    display: flex;
+    flex-direction: column;
+    flex-basis: 100%;
+    gap: 4px;
+    margin-left: 6px;
+    padding: 4px 0 4px 12px;
+    border-left: 2px solid var(--cizgi);
+}
+
+.saat-saat[hidden] {
+    display: none;
+}
+
+.dilim-satiri {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.dilim-saati {
+    color: var(--soluk-yazi);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Tek saatin küçük seçicisi: simge + kısa ad; dar pencerede sadece simge (ad ipucunda kalır). */
+.durum-secici.kucuk button {
+    padding: 2px 7px;
+    font-size: 11px;
+}
+
+.durum-secici .kisa-ad {
+    margin-left: 4px;
+}
+
+@media (max-width: 900px) {
+    .durum-secici .kisa-ad {
+        display: none;
+    }
+}
+
+/* Saatler farklı işaretliyse: "Karışık" rozeti ve "1. saat katıldı · 2. saat katılmadı" özeti */
+.yoklama-bilgisi .hap,
+.gecmis-satiri .hap {
+    margin-left: 4px;
+    padding: 1px 7px;
+    font-size: 11px;
+}
+
+.dilim-ozeti {
+    display: block;
+    color: var(--soluk-yazi);
+}
+
+.gecmis-satiri .hap {
+    margin-left: 0;
+}
+
 /* ---------- Sağ panel: Devamsızlık sekmesi ---------- */
 
 .yoklama-karti {
@@ -2239,6 +2337,16 @@ body {
 .gecmis-satiri .durum-secici button {
     width: 26px;
     padding: 3px 0;
+}
+
+/* 2+ saatlik oturumda "Saat saat" bölümü satırın altına iner. */
+.gecmis-satiri {
+    flex-wrap: wrap;
+}
+
+.gecmis-satiri > div:first-child {
+    flex: 1;
+    min-width: 0;
 }
 
 /* ============================================================

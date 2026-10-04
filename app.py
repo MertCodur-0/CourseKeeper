@@ -113,9 +113,8 @@ ROUND_MODE = "none"
 GPA_ROUNDING = "round"
 
 # ---------- Devamsızlık (yoklama) ayarları: sadece burada tanımlı ----------
-# Devamsızlık hangi birimle sayılır?
-#   "hour"    : oturumun süresi kadar saat (2 saatlik derse gelmemek = 2 saat devamsızlık)
-#   "session" : her oturum 1 sayılır
+# Devamsızlık birimi: ders saati. Yoklama oturumun bir saatlik dilimleri için ayrı ayrı tutulur
+# (2 saatlik dersin sadece 2. saatine gelmemek = 1 saat devamsızlık). Başka seçenek yoktur.
 ATTENDANCE_UNIT = "hour"
 # İzin verilen devamsızlık (toplam × yüzde / 100) tam sayı değilse nasıl yuvarlanır? "floor": aşağı.
 LIMIT_ROUNDING = "floor"
@@ -123,17 +122,20 @@ LIMIT_ROUNDING = "floor"
 UYARI_KALAN_BIRIM = 2
 UYARI_KULLANIM_ORANI = 0.75
 
-# Yoklama durumları. "ad": düğmedeki yazı, "simge": takvimdeki ve listelerdeki küçük işaret.
+# Yoklama durumları. "ad": düğmedeki yazı, "kisa": saat saat düğmelerindeki kısa yazı,
+# "ozet": özet cümlelerindeki hali ("1. saat katıldı"), "simge": takvimdeki ve listelerdeki küçük işaret.
 #   katildi   : derse gidildi
 #   katilmadi : gidilmedi (devamsızlık sayılır)
 #   alinmadi  : yoklama alınmadı (toplamda kalır, devamsızlık sayılmaz)
 #   iptal     : ders yapılmadı (dönem toplamından düşer)
 YOKLAMA_DURUMLARI = [
-    {"anahtar": "katildi", "ad": "Katıldım", "simge": "✓"},
-    {"anahtar": "katilmadi", "ad": "Katılmadım", "simge": "✗"},
-    {"anahtar": "alinmadi", "ad": "Yoklama alınmadı", "simge": "–"},
-    {"anahtar": "iptal", "ad": "Ders iptal", "simge": "⊘"},
+    {"anahtar": "katildi", "ad": "Katıldım", "kisa": "Katıldım", "ozet": "katıldı", "simge": "✓"},
+    {"anahtar": "katilmadi", "ad": "Katılmadım", "kisa": "Katılmadım", "ozet": "katılmadı", "simge": "✗"},
+    {"anahtar": "alinmadi", "ad": "Yoklama alınmadı", "kisa": "Alınmadı", "ozet": "alınmadı", "simge": "–"},
+    {"anahtar": "iptal", "ad": "Ders iptal", "kisa": "İptal", "ozet": "iptal", "simge": "⊘"},
 ]
+# Oturumun saatleri farklı işaretliyse (ör. 1. saat katıldı, 2. saat katılmadı) gösterilen simge.
+KARISIK_SIMGESI = "◐"
 
 # GPA hesabında dersin hangi kredisi kullanılır? (Dönem ekranındaki ayar; varsayılan ilki.)
 KREDI_BIRIMLERI = [
@@ -318,15 +320,16 @@ def veritabani_hazirla():
             bitis     TEXT NOT NULL               -- tek günse başlangıçla aynı
         );
 
-        -- Yoklama: bir oturumun belirli bir tarihteki dersi için durum. Oturum (ya da dersi)
-        -- silinince kayıtları da silinir.
+        -- Yoklama: bir oturumun belirli bir tarihteki dersinin bir saatlik dilimi için durum.
+        -- Oturum (ya da dersi) silinince kayıtları da silinir.
         CREATE TABLE IF NOT EXISTS yoklamalar (
             id          INTEGER PRIMARY KEY,
             oturum_id   INTEGER NOT NULL REFERENCES oturumlar(id) ON DELETE CASCADE,
             tarih       TEXT NOT NULL,            -- dersin yapıldığı gün, "2026-10-05"
+            dilim       TEXT NOT NULL,            -- dilimin başlangıç saati, "09:00"
             durum       TEXT NOT NULL,            -- YOKLAMA_DURUMLARI listesindeki anahtar
             guncellenme TEXT NOT NULL,            -- son değişiklik zamanı
-            UNIQUE (oturum_id, tarih)
+            UNIQUE (oturum_id, tarih, dilim)
         );
 
         -- GPA ayarları (dönemden bağımsız, tek kayıt, id hep 1).
@@ -418,6 +421,9 @@ def veri_surumunu_yukselt(baglanti):
     Sürüm 1: Eskiden bütün kalemlerin alınan puanı 100 üzerinden saklanıyordu. Vize ve final
     dışındaki kalemlerde değer artık doğrudan puandır: yeni = eski × ağırlık / 100.
     Dönüşümden önce veritabanının yedeği alınır; her dersin toplam puanı aynı kalmalıdır.
+
+    Sürüm 2: Yoklama eskiden oturum başına tek kayıttı; artık oturumun her bir saatlik dilimi için
+    ayrı kayıt tutulur (ayrıntı: yoklamayi_dilimlere_ac).
     """
     # Başka bir işlem aynı anda dönüştürmesin diye önce yazma kilidi alınır.
     baglanti.execute("BEGIN IMMEDIATE")
@@ -459,10 +465,99 @@ def veri_surumunu_yukselt(baglanti):
                         f"({eski_toplam} -> {sonraki[ders_id]}). Hiçbir değişiklik kaydedilmedi."
                     )
             baglanti.execute("PRAGMA user_version = 1")
+        if surum < 2:
+            yoklamayi_dilimlere_ac(baglanti)
+            baglanti.execute("PRAGMA user_version = 2")
         baglanti.commit()
     except Exception:
         baglanti.rollback()
         raise
+
+
+def oturum_dilimleri(baslangic, bitis):
+    """Oturumun bir saatlik dilimlerinin başlangıç saatleri: "09:00"-"11:00" -> ["09:00", "10:00"].
+
+    Süre tam saat değilse dilim sayısı yukarı yuvarlanır; en az bir dilim vardır.
+    (Aynı kural tarayıcıda da var: static/yoklama.js, oturumDilimleri.)
+    """
+    ilk = int(baslangic[:2]) * 60 + int(baslangic[3:])
+    son = int(bitis[:2]) * 60 + int(bitis[3:])
+    sayi = max(1, -(-(son - ilk) // 60))
+    return [f"{(ilk + 60 * sira) // 60:02d}:{(ilk + 60 * sira) % 60:02d}" for sira in range(sayi)]
+
+
+def yoklamayi_dilimlere_ac(baglanti):
+    """Oturum bazlı eski yoklama kayıtlarını bir saatlik dilimlere açar (veri sürümü 2).
+
+    Her eski kayıt, oturumunun her dilimi için aynı durumla bir kayda dönüşür; sonra eski tablo
+    kaldırılır. Her dersin gidilen / gidilmeyen / alınmadı / iptal saat toplamı önce ve sonra
+    karşılaştırılır; fark varsa hata verilir ve hiçbir değişiklik kaydedilmez.
+    """
+    sutunlar = [satir["name"] for satir in baglanti.execute("PRAGMA table_info(yoklamalar)")]
+    if "dilim" in sutunlar:
+        return   # tablo zaten dilimli (yeni kurulmuş veritabanı)
+
+    eski_kayitlar = baglanti.execute(
+        "SELECT y.oturum_id, y.tarih, y.durum, y.guncellenme, o.ders_id, o.baslangic, o.bitis, d.kod"
+        " FROM yoklamalar y LEFT JOIN oturumlar o ON o.id = y.oturum_id"
+        " LEFT JOIN dersler d ON d.id = o.ders_id"
+    ).fetchall()
+    if eski_kayitlar:
+        yedek = PROJE_KLASORU / f"derstakip.backup-{datetime.now():%Y-%m-%d-%H%M%S}-donusum-oncesi.db"
+        shutil.copy2(VERITABANI_DOSYASI, yedek)
+        print(f"Veri dönüşümü (sürüm 2): {len(eski_kayitlar)} yoklama kaydı saatlere açılıyor. Yedek: {yedek.name}")
+
+    baglanti.execute("""
+        CREATE TABLE yoklamalar_yeni (
+            id          INTEGER PRIMARY KEY,
+            oturum_id   INTEGER NOT NULL REFERENCES oturumlar(id) ON DELETE CASCADE,
+            tarih       TEXT NOT NULL,
+            dilim       TEXT NOT NULL,
+            durum       TEXT NOT NULL,
+            guncellenme TEXT NOT NULL,
+            UNIQUE (oturum_id, tarih, dilim)
+        )
+    """)
+    onceki = {}        # (ders kodu, durum) -> saat (dönüşümden önce: oturumun süresi kadar)
+    yuvarlananlar = set()
+    for kayit in eski_kayitlar:
+        if kayit["ders_id"] is None:
+            raise RuntimeError(
+                "Veri dönüşümü durduruldu: oturumu bulunmayan yoklama kaydı var. "
+                "Hiçbir değişiklik kaydedilmedi."
+            )
+        dilimler = oturum_dilimleri(kayit["baslangic"], kayit["bitis"])
+        anahtar = (kayit["kod"], kayit["durum"])
+        # Süresi tam saat olmayan oturum yukarı yuvarlanmış dilim sayısıyla sayılır ve bildirilir.
+        onceki[anahtar] = onceki.get(anahtar, 0) + len(dilimler)
+        if kayit["baslangic"][3:] != kayit["bitis"][3:]:
+            yuvarlananlar.add(f'{kayit["kod"]} {kayit["baslangic"]}-{kayit["bitis"]} -> {len(dilimler)} saat')
+        for dilim in dilimler:
+            baglanti.execute(
+                "INSERT INTO yoklamalar_yeni (oturum_id, tarih, dilim, durum, guncellenme) VALUES (?, ?, ?, ?, ?)",
+                (kayit["oturum_id"], kayit["tarih"], dilim, kayit["durum"], kayit["guncellenme"]),
+            )
+
+    # Kontrol: her dersin durum başına saat toplamı aynı kalmalı.
+    sonraki = {
+        (satir["kod"], satir["durum"]): satir["saat"] for satir in baglanti.execute(
+            "SELECT d.kod, y.durum, COUNT(*) AS saat FROM yoklamalar_yeni y"
+            " JOIN oturumlar o ON o.id = y.oturum_id JOIN dersler d ON d.id = o.ders_id"
+            " GROUP BY d.kod, y.durum"
+        )
+    }
+    if sonraki != onceki:
+        raise RuntimeError(
+            f"Veri dönüşümü durduruldu: yoklama saat toplamları değişiyor ({onceki} -> {sonraki}). "
+            "Hiçbir değişiklik kaydedilmedi."
+        )
+    baglanti.execute("DROP TABLE yoklamalar")
+    baglanti.execute("ALTER TABLE yoklamalar_yeni RENAME TO yoklamalar")
+
+    for (kod, durum), saat in sorted(onceki.items()):
+        print(f"  {kod}: {durum} {saat} saat (önce ve sonra aynı)")
+    for yuvarlanan in sorted(yuvarlananlar):
+        print("UYARI: süresi tam saat olmayan oturum yukarı yuvarlandı ->", yuvarlanan)
 
 
 def dersleri_getir(baglanti):
@@ -929,6 +1024,7 @@ def ana_sayfa():
         en_fazla_agirlik=EN_FAZLA_AGIRLIK,
         ders_disi_turleri=DERS_DISI_TURLERI,
         yoklama_durumlari=YOKLAMA_DURUMLARI,
+        karisik_simgesi=KARISIK_SIMGESI,
         kredi_birimleri=KREDI_BIRIMLERI,
         # JavaScript'in ihtiyaç duyduğu ayarlar (sayfaya JSON olarak yazılır).
         ayarlar={
@@ -945,7 +1041,7 @@ def ana_sayfa():
             "gpaRounding": GPA_ROUNDING,
             "dersDisiTurleri": DERS_DISI_TURLERI,
             "yoklamaDurumlari": YOKLAMA_DURUMLARI,
-            "yoklamaBirimi": ATTENDANCE_UNIT,
+            "karisikSimgesi": KARISIK_SIMGESI,
             "limitYuvarlama": LIMIT_ROUNDING,
             "uyariKalanBirim": UYARI_KALAN_BIRIM,
             "uyariKullanimOrani": UYARI_KULLANIM_ORANI,
@@ -1149,7 +1245,7 @@ def yoklama_verisi(baglanti):
     ve bütün yoklama kayıtları. Hesap tarayıcıda yapılır (static/yoklama.js)."""
     sonuc = donemi_getir(baglanti)
     sonuc["kayitlar"] = [dict(satir) for satir in baglanti.execute(
-        "SELECT oturum_id, tarih, durum FROM yoklamalar ORDER BY tarih, oturum_id"
+        "SELECT oturum_id, tarih, dilim, durum FROM yoklamalar ORDER BY tarih, oturum_id, dilim"
     )]
     sonuc["simdi"] = simdi().strftime("%Y-%m-%dT%H:%M")
     return sonuc
@@ -1293,26 +1389,44 @@ def api_ara():
 
 @app.route("/api/yoklama", methods=["PUT"])
 def api_yoklamayi_kaydet():
-    """Bir ya da birkaç yoklama kaydını yazar. Aynı oturum ve tarih için kayıt varsa durumu değişir."""
+    """Bir ya da birkaç yoklama kaydını yazar: {"kayitlar": [{oturum_id, tarih, dilim, durum}]}.
+
+    Aynı oturum, tarih ve dilim için kayıt varsa durumu değişir. "sadece_bos": true gelirse
+    (toplu düğmeler) mevcut kayıtlara dokunulmaz, sadece kaydı olmayan dilimler yazılır.
+    """
     veri = request.get_json(silent=True) or {}
     kayitlar = veri.get("kayitlar")
+    sadece_bos = veri.get("sadece_bos") is True
     durumlar = [durum["anahtar"] for durum in YOKLAMA_DURUMLARI]
     if not isinstance(kayitlar, list) or not kayitlar:
         return jsonify({"hata": "Kaydedilecek yoklama yok."}), 400
     for kayit in kayitlar:
         if (not isinstance(kayit, dict) or not isinstance(kayit.get("oturum_id"), int)
-                or not tarih_gecerli_mi(metin(kayit.get("tarih"))) or kayit.get("durum") not in durumlar):
+                or not tarih_gecerli_mi(metin(kayit.get("tarih"))) or kayit.get("durum") not in durumlar
+                or not isinstance(kayit.get("dilim"), str)):
             return jsonify({"hata": "Geçersiz yoklama kaydı."}), 400
     zaman = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     baglanti = veritabani_baglan()
+    # Dilim, oturumun şimdiki saatlerinden biri olmalı.
+    oturumlar = {satir["id"]: satir for satir in baglanti.execute("SELECT id, baslangic, bitis FROM oturumlar")}
+    for kayit in kayitlar:
+        oturum = oturumlar.get(kayit["oturum_id"])
+        if oturum is None:
+            baglanti.close()
+            return jsonify({"hata": "Oturum bulunamadı; sayfayı yenileyip tekrar dene."}), 404
+        if kayit["dilim"] not in oturum_dilimleri(oturum["baslangic"], oturum["bitis"]):
+            baglanti.close()
+            return jsonify({"hata": "Geçersiz yoklama kaydı."}), 400
+    catisma = "DO NOTHING" if sadece_bos else (
+        "DO UPDATE SET durum = excluded.durum, guncellenme = excluded.guncellenme"
+    )
     try:
         with baglanti:
             for kayit in kayitlar:
                 baglanti.execute(
-                    "INSERT INTO yoklamalar (oturum_id, tarih, durum, guncellenme) VALUES (?, ?, ?, ?)"
-                    " ON CONFLICT (oturum_id, tarih) DO UPDATE SET durum = excluded.durum,"
-                    " guncellenme = excluded.guncellenme",
-                    (kayit["oturum_id"], kayit["tarih"], kayit["durum"], zaman),
+                    "INSERT INTO yoklamalar (oturum_id, tarih, dilim, durum, guncellenme) VALUES (?, ?, ?, ?, ?)"
+                    f" ON CONFLICT (oturum_id, tarih, dilim) {catisma}",
+                    (kayit["oturum_id"], kayit["tarih"], kayit["dilim"], kayit["durum"], zaman),
                 )
     except sqlite3.IntegrityError:
         # Oturum bu arada silinmiş olabilir.

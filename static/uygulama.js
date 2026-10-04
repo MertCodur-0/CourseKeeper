@@ -877,7 +877,7 @@ async function dersiKaydet() {
                 const kayitSayisi = yoklamaKayitSayisi(oturum.id);
                 if (kalanlar.includes(oturum.id) || kayitSayisi === 0) continue;
                 const onay = confirm(`${AYARLAR.gunler[oturum.gun]} ${oturum.baslangic}-${oturum.bitis} oturumunu sildin. `
-                    + `Bu oturumun ${kayitSayisi} yoklama kaydı da silinecek. Devam edilsin mi?`);
+                    + `Bu oturumun ${kayitSayisi} saatlik yoklama kaydı da silinecek. Devam edilsin mi?`);
                 if (!onay) return;
             }
             await istekGonder("PUT", `/api/dersler/${duzenlenenDersId}`, formuOku());
