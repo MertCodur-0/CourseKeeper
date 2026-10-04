@@ -1,0 +1,5 @@
+node_modules/
+out/
+demo/demo.db
+demo/demo_hava.json
+demo/ekranlar/
