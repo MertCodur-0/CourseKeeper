@@ -172,7 +172,8 @@ function limitHesapla(toplam, yuzde) {
 }
 
 // Dersin devamsızlık durumu. Havuzlar: lab hakkı dolu VE lab oturumu varsa "Teori" ve "Lab" ayrı;
-// aksi halde tek havuz "Toplam". Her havuz için bütün sayaçlar burada, tek yerde hesaplanır.
+// aksi halde tek havuz "Toplam". Online oturumlar her zaman ana havuzdadır (teoriyle birlikte sayılır).
+// Her havuz için bütün sayaçlar burada, tek yerde hesaplanır.
 // Birim dilimdir (1 saat): her dilim kendi durumuyla sayılır.
 function dersYoklamasi(ders) {
     const labOturumlari = ders.oturumlar.filter((oturum) => oturum.tur === "lab");
@@ -429,7 +430,8 @@ function yoklamaPenceresiniCiz() {
             nokta.style.background = renkBul(ders.renk).kod;
             const bilgi = eleman("div", "yoklama-bilgisi");
             bilgi.appendChild(eleman("strong", "", ders.kod));
-            const ayrinti = [`${oturum.baslangic}-${oturum.bitis}`, oturum.derslik];
+            const ayrinti = [`${oturum.baslangic}-${oturum.bitis}`];
+            if (oturum.derslik) ayrinti.push(oturum.derslik);   // online oturumda derslik boş olabilir
             if (oturum.tur) ayrinti.push(oturum.tur);
             bilgi.appendChild(eleman("small", "", " · " + ayrinti.join(" · ")));
             const parcalar = yoklamaParcalari(oturum, tarih, true, yoklamaHatasi);

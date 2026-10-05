@@ -38,7 +38,7 @@ class SyllabusHatasi(Exception):
 # ============================================================
 
 GUN_ADLARI = ["pazartesi", "sali", "carsamba", "persembe", "cuma", "cumartesi", "pazar"]
-OTURUM_TURLERI = ["teori", "lab"]
+OTURUM_TURLERI = ["teori", "lab", "online"]
 # Kalemin genel türü. "Vize 1 / Vize 2" gibi numaralandırmayı app.py yapar.
 KALEM_TURLERI = ["vize", "final", "quiz", "odev", "proje", "lab", "diger"]
 
@@ -79,15 +79,18 @@ CIKTI_SEMASI = {
              "zorunlu_katilim_yuzde", "lab_zorunlu_katilim_yuzde"]),
         "oturumlar": {
             "type": "array",
-            "description": "Haftalık ders saatleri. Teori ve lab ayrı satırlardaysa ayrı oturumlar.",
+            "description": "Haftalık ders saatleri. Teori, lab ve online ayrı satırlardaysa ayrı oturumlar.",
             "items": {
                 "type": "object",
                 "properties": {
                     "gun": _bos_olabilir("string", "Haftanın günü.", enum=GUN_ADLARI),
                     "baslangic": _bos_olabilir("string", "Başlangıç saati, 24 saat biçiminde SS:DD (ör. 13:30)."),
                     "bitis": _bos_olabilir("string", "Bitiş saati, 24 saat biçiminde SS:DD."),
-                    "derslik": _bos_olabilir("string", "Derslik / sınıf / oda."),
-                    "tur": _bos_olabilir("string", "Oturum türü, belgede belliyse.", enum=OTURUM_TURLERI),
+                    "derslik": _bos_olabilir(
+                        "string", "Derslik / sınıf / oda. Online oturumda derslik yazmıyorsa null."),
+                    "tur": _bos_olabilir(
+                        "string", "Oturum türü, belgede belliyse. Uzaktan / çevrim içi yapılan oturum 'online'.",
+                        enum=OTURUM_TURLERI),
                     "emin_olmayanlar": _emin_olmayanlar(["gun", "baslangic", "bitis", "derslik", "tur"]),
                 },
                 "required": ["gun", "baslangic", "bitis", "derslik", "tur", "emin_olmayanlar"],
@@ -148,6 +151,11 @@ Alanlar:
   gun: Pazartesi/Monday/Mon/Pzt -> "pazartesi", Salı/Tuesday/Tue/Sal -> "sali", Çarşamba/Wednesday/Wed/Çar -> "carsamba",
   Perşembe/Thursday/Thu/Per -> "persembe", Cuma/Friday/Fri/Cum -> "cuma", Cumartesi/Saturday/Sat/Cmt -> "cumartesi",
   Pazar/Sunday/Sun/Paz -> "pazar".
+  tur: lecture / teori -> "teori"; lab / laboratuvar / uygulama -> "lab"; ders programında o oturum için
+  "online", "uzaktan", "uzaktan eğitim", "çevrim içi", "çevrimiçi", "distance", "remote", "Zoom", "Teams" gibi
+  bir ifade varsa -> "online". Belgede tür belli değilse null.
+  derslik: online oturumda belgede bir derslik yazmıyorsa null bırak; "Online", "Zoom" gibi ifadeleri
+  ya da bağlantı adreslerini derslik olarak YAZMA.
 - Saatler: her zaman 24 saat biçiminde SS:DD yaz (ör. "1:30 PM" -> "13:30"). Saati belgedeki gibi bırak, YUVARLAMA.
 - degerlendirmeler: not kalemleri. Her kalemin belgedeki adı (ad), genel türü (tur), ağırlık yüzdesi,
   varsa tarihi ve saatleri. tur: midterm / ara sınav / vize -> "vize"; final -> "final"; quiz / kısa sınav -> "quiz";

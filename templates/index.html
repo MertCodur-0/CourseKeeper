@@ -228,18 +228,29 @@
                 <!-- Sekme: Devamsızlık (içeriğini static/yoklama.js çizer) -->
                 <div class="sekme-icerigi" role="tabpanel" data-sekme="devamsizlik" id="devamsizlik-icerigi" aria-labelledby="sekme-devamsizlik" hidden></div>
 
-                <!-- Sekme: Notlar (yazarken otomatik kaydedilir; rozet kayıt durumunu gösterir) -->
+                <!-- Sekme: Notlar. Tek kutuda iki bölüm: üstte "Syllabus" (dersin saklanan dosyası; içeriğini
+                     static/uygulama.js çizer), altında "Ders notları" (yazarken otomatik kaydedilir; rozet
+                     kayıt durumunu gösterir). -->
                 <div class="sekme-icerigi" role="tabpanel" data-sekme="notlar" id="icerik-notlar" aria-labelledby="sekme-notlar" hidden>
-                    <section class="ozet-karti tonlu ton-amber not-karti">
-                        <header class="ozet-basligi">
-                            <span class="simge-karesi kare-ton"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M9 8h3"/><path d="M9 12h7"/><path d="M9 16h7"/></svg></span>
-                            <h3>Ders notları</h3>
-                            <span class="hap olumlu" id="not-durumu" role="status"></span>
-                        </header>
-                        <div class="ozet-govdesi">
-                            <textarea class="ders-notlari" id="ders-notlari" placeholder="Bu dersle ilgili notların..." aria-label="Ders notları"></textarea>
-                            <p class="kucuk-not" id="not-zamani" hidden></p>
-                        </div>
+                    <section class="sekme-karti tonlu ton-amber not-karti">
+                        <section class="ozet-karti">
+                            <header class="ozet-basligi">
+                                <span class="simge-karesi kare-ton"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M10 13h6"/><path d="M10 17h6"/></svg></span>
+                                <h3>Syllabus</h3>
+                            </header>
+                            <div class="ozet-govdesi" id="syllabus-karti"></div>
+                        </section>
+                        <section class="ozet-karti not-bolumu">
+                            <header class="ozet-basligi">
+                                <span class="simge-karesi kare-ton"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M9 8h3"/><path d="M9 12h7"/><path d="M9 16h7"/></svg></span>
+                                <h3>Ders notları</h3>
+                                <span class="hap olumlu" id="not-durumu" role="status"></span>
+                            </header>
+                            <div class="ozet-govdesi">
+                                <textarea class="ders-notlari" id="ders-notlari" placeholder="Bu dersle ilgili notların..." aria-label="Ders notları"></textarea>
+                                <p class="kucuk-not" id="not-zamani" hidden></p>
+                            </div>
+                        </section>
                     </section>
                 </div>
 
@@ -473,7 +484,7 @@
                     <span>Gün <b class="yildiz">*</b></span>
                     <span>Başlangıç <b class="yildiz">*</b></span>
                     <span>Bitiş <b class="yildiz">*</b></span>
-                    <span>Derslik <b class="yildiz">*</b></span>
+                    <span title="Online oturumda derslik zorunlu değil">Derslik <b class="yildiz">*</b></span>
                     <span>Tür</span>
                     <span></span>
                 </div>
@@ -500,6 +511,13 @@
                 <p class="mesaj" id="agirlik-toplami" hidden></p>
             </details>
 
+            <!-- Syllabus dosyası (opsiyonel). Seçilen dosya Kaydet'e basınca derse eklenir.
+                 İçeriğini static/uygulama.js çizer (formSyllabusunuCiz). -->
+            <section class="bolum">
+                <h3>Syllabus <small>(opsiyonel)</small></h3>
+                <div id="form-syllabus"></div>
+            </section>
+
             <p class="mesaj hata" id="kayit-hatasi" hidden></p>
 
             <footer class="pencere-dugmeleri">
@@ -522,9 +540,10 @@
                 <button type="button" class="kapat" id="donem-kapat" aria-label="Kapat">×</button>
             </header>
 
+            <!-- Her sekmenin kendi tonu var (Akademik takvim mavi, GPA amber); simgeler sol çubuktakilerle aynı. -->
             <nav class="sekmeler" id="donem-sekmeleri">
-                <button type="button" data-sekme="takvim">Akademik takvim</button>
-                <button type="button" data-sekme="gpa">GPA</button>
+                <button type="button" class="ton-mavi" data-sekme="takvim"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/><path d="M7.5 14.5h4M14 14.5h2.5"/></svg><span>Akademik takvim</span></button>
+                <button type="button" class="ton-amber" data-sekme="gpa"><svg class="simge" viewBox="0 0 24 24" aria-hidden="true"><path d="m3.5 17 6-6 4 4 7-7.5"/><path d="M15 7.5h5.5V13"/></svg><span>GPA</span></button>
             </nav>
 
             <!-- Sekme: Akademik takvim -->
@@ -705,6 +724,9 @@
             <button type="button" class="satir-sil" title="Tarihi sil" aria-label="Tarihi sil">×</button>
         </div>
     </template>
+
+    <!-- Syllabus yükleme alanlarının (Notlar sekmesi ve ders formu) ortak, gizli dosya seçicisi. -->
+    <input type="file" id="syllabus-dosya-girdisi" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" hidden>
 
     <!-- Form satırı şablonları: JavaScript "+ ekle"ye basılınca bunları kopyalar. -->
     <template id="oturum-sablonu">

@@ -13,6 +13,10 @@ let siradakiRenk = null;        // yeni derse önerilecek (kullanılmayan ilk) r
 let duzenlenenDersId = null;    // formda açık olan dersin kimliği (yeni derste null)
 let okumaNo = 0;                // her syllabus okumasının numarası (pencere kapanınca eski okuma yok sayılır)
 let haftaKaymasi = 0;           // gösterilen hafta: 0 = bu hafta, -1 = geçen hafta, 1 = gelecek hafta
+// Ders formundaki syllabus seçimi (Kaydet'e basılınca derse eklenir):
+//   dosya  : formda seçilen/bırakılan dosya (File)
+//   gecici : "Syllabus ile ekle" akışında sunucuda geçici duran dosya ({kimlik, ad, boyut})
+let formSyllabusu = { dosya: null, gecici: null };
 
 const AY_KISALTMALARI = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
 
@@ -373,6 +377,8 @@ function blokOlustur(yerlesim) {
     const altYazi = document.createElement("span");
     altYazi.className = "blok-derslik";
     altYazi.textContent = yerlesim.altYazi;
+    // Online oturumda derslik yerine küçük bir ekran simgesiyle "Online" yazar.
+    if (yerlesim.online) altYazi.insertAdjacentHTML("afterbegin", ONLINE_SIMGESI);
 
     icerik.append(kod, altYazi);
     cekirdek.append(icerik, menuDugmesiOlustur());
@@ -401,6 +407,10 @@ function seritEtiketiOlustur(ders, yazi, kalemId) {
     etiket.append(yaziDugmesi, menuDugmesiOlustur());
     return etiket;
 }
+
+// Online oturum bloğundaki küçük ekran simgesi (satır içi SVG).
+const ONLINE_SIMGESI = '<svg class="online-simgesi" viewBox="0 0 24 24" aria-hidden="true">'
+    + '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M9 21h6"/><path d="M12 17v4"/></svg>';
 
 // Yazı bloğa sığmıyorsa sırayla denenecek basamaklar: [kod ile derslik arası boşluk, yazı boyutu] (px).
 // Önce aradaki boşluk daralır, sonra yazı küçülür. İlk basamak normal görünümdür.
@@ -465,12 +475,16 @@ function takvimiCiz() {
                 const bas = Math.max(aralik.bas, AYARLAR.ilkSaat);
                 const bit = Math.min(aralik.bit, AYARLAR.sonSaat);
                 if (bit <= bas) continue;
+                // Online oturumda derslik yerine "Online" yazar (derslik boş olabilir).
+                const online = oturum.tur === "online";
+                const yer = online ? "Online" : oturum.derslik;
                 yerlesimler.push({
                     ders, bas, bit,
                     renk: renkBul(ders.renk),
-                    altYazi: oturum.derslik,
+                    altYazi: yer,
+                    online,
                     oturum, tarih,   // yoklama simgesi için: hangi oturumun hangi günkü dersi
-                    ipucu: `${ders.kod} · ${oturum.derslik} · ${oturum.baslangic}-${oturum.bitis}`,
+                    ipucu: `${ders.kod} · ${yer} · ${oturum.baslangic}-${oturum.bitis}`,
                 });
             }
 
@@ -560,14 +574,9 @@ function syllabusHatasiGoster(yazi) {
 // API anahtarı sunucudadır, tarayıcıya hiç gelmez.
 async function syllabusOku(dosya) {
     mesajGoster(syllabusHatasi, "");
-    const turUygun = ["application/pdf", "image/png", "image/jpeg"].includes(dosya.type)
-        || /\.(pdf|png|jpe?g)$/i.test(dosya.name);
-    if (!turUygun) {
-        syllabusHatasiGoster("Bu dosya türü desteklenmiyor. Lütfen PDF, PNG veya JPG dosyası seç.");
-        return;
-    }
-    if (dosya.size > AYARLAR.syllabusEnFazlaMB * 1024 * 1024) {
-        syllabusHatasiGoster(`Dosya çok büyük. En fazla ${AYARLAR.syllabusEnFazlaMB} MB'lık dosya yükleyebilirsin.`);
+    const dosyaHatasi = syllabusDosyaHatasi(dosya);
+    if (dosyaHatasi) {
+        syllabusHatasiGoster(dosyaHatasi);
         return;
     }
 
@@ -584,13 +593,197 @@ async function syllabusOku(dosya) {
     } catch {
         hata = "Sunucuya ulaşılamadı ya da yanıt anlaşılamadı. Sunucunun çalıştığından emin olup tekrar dene.";
     }
-    // Bu arada pencere kapatıldıysa ya da başka bir okuma başladıysa sonucu yok say.
-    if (buOkuma !== okumaNo || !pencere.open) return;
+    // Bu arada pencere kapatıldıysa ya da başka bir okuma başladıysa sonucu yok say
+    // (sunucuda geçici saklanan dosya da silinir).
+    if (buOkuma !== okumaNo || !pencere.open) {
+        if (!hata) geciciSyllabusuSil(sonuc.gecici);
+        return;
+    }
     if (hata) {
         syllabusHatasiGoster(hata);
         return;
     }
-    dersFormunuAc(sonuc.ders, sonuc.uyarilar || []);
+    // Okunan dosya sunucuda geçici duruyor; ders kaydedilince derse bağlanır.
+    dersFormunuAc(sonuc.ders, sonuc.uyarilar || [], sonuc.gecici || null);
+}
+
+// ---------- Syllabus dosyası: ortak yardımcılar (ders formu ve Notlar sekmesi) ----------
+
+// Dosya yüklenmeye uygun mu? Uygunsa "", değilse gösterilecek hata mesajı.
+// (Asıl kontrol sunucudadır: uzantı, dosyanın ilk baytları ve boyut. Bu sadece erken uyarıdır.)
+function syllabusDosyaHatasi(dosya) {
+    if (!/\.(pdf|png|jpe?g)$/i.test(dosya.name)) {
+        return "Bu dosya türü desteklenmiyor. Lütfen PDF, PNG veya JPG dosyası seç.";
+    }
+    if (dosya.size > AYARLAR.syllabusEnFazlaMB * 1024 * 1024) {
+        return `Dosya çok büyük. En fazla ${AYARLAR.syllabusEnFazlaMB} MB'lık dosya yükleyebilirsin.`;
+    }
+    return "";
+}
+
+// Dosyayı derse yükler (dersin eski syllabus'u varsa yerine geçer). Hata olursa mesajıyla fırlatır.
+async function syllabusYukle(dersId, dosya) {
+    const dosyaHatasi = syllabusDosyaHatasi(dosya);
+    if (dosyaHatasi) throw new Error(dosyaHatasi);
+    const veri = new FormData();
+    veri.append("dosya", dosya);
+    let yanit;
+    try {
+        yanit = await fetch(`/api/dersler/${dersId}/syllabus`, { method: "POST", body: veri });
+    } catch {
+        throw new Error("Sunucuya ulaşılamadı. Sunucunun çalıştığından emin olup tekrar dene.");
+    }
+    let sonuc = {};
+    try {
+        sonuc = await yanit.json();
+    } catch {
+        // yanıt JSON değil: aşağıdaki genel mesaj gösterilir
+    }
+    if (!yanit.ok) throw new Error(sonuc.hata || "Syllabus yüklenemedi.");
+}
+
+// Sunucuda geçici duran syllabus dosyasını siler (vazgeçilince). keepalive: sayfa kapanırken de ulaşsın.
+function geciciSyllabusuSil(gecici) {
+    if (!gecici) return;
+    fetch(`/api/syllabus/gecici/${gecici.kimlik}`, { method: "DELETE", keepalive: true }).catch(() => {});
+}
+
+// 345678 -> "338 KB", 2500000 -> "2.4 MB"
+function boyutYazisi(bayt) {
+    if (bayt < 1024 * 1024) return `${Math.max(1, Math.round(bayt / 1024))} KB`;
+    return `${Math.round(bayt / 1024 / 1024 * 10) / 10} MB`;
+}
+
+// "2026-10-05T14:30" -> "05.10.2026 14:30"
+function zamaniGoster(zaman) {
+    const [tarih, saat] = zaman.split("T");
+    return `${tarih.split("-").reverse().join(".")} ${saat || ""}`.trim();
+}
+
+// Ortak gizli dosya seçiciyi açar; dosya seçilince secilince(dosya) çağrılır.
+const syllabusDosyaGirdisi = document.getElementById("syllabus-dosya-girdisi");
+let dosyaSecilince = null;
+function syllabusDosyasiSectir(secilince) {
+    dosyaSecilince = secilince;
+    syllabusDosyaGirdisi.click();
+}
+syllabusDosyaGirdisi.addEventListener("change", () => {
+    const dosya = syllabusDosyaGirdisi.files[0];
+    syllabusDosyaGirdisi.value = "";   // aynı dosya tekrar seçilebilsin
+    if (dosya && dosyaSecilince) dosyaSecilince(dosya);
+});
+
+function kucukDugme(yazi, tiklaninca, sinif = "") {
+    const dugme = eleman("button", `dugme kucuk ${sinif}`.trim(), yazi);
+    dugme.type = "button";
+    dugme.addEventListener("click", tiklaninca);
+    return dugme;
+}
+
+// Dersin syllabus dosyasını yeni sekmede açan bağlantı ("Aç").
+function syllabusAcBaglantisi(dersId) {
+    const baglanti = eleman("a", "dugme kucuk", "Aç");
+    baglanti.href = `/api/dersler/${dersId}/syllabus`;
+    baglanti.target = "_blank";
+    baglanti.rel = "noopener";
+    return baglanti;
+}
+
+// Syllabus kutusunu çizer (Notlar sekmesinde ve ders formunda aynı görünüm):
+//   baslik, aciklama : dosya adı ve altındaki soluk satır (dosya yoksa "Henüz syllabus eklenmemiş")
+//   dugmeler         : sağdaki/alttaki küçük düğmeler
+//   yukleniyor       : true ise düğmeler yerine dönen halka ve "Yükleniyor..." görünür
+//   hata             : kırmızı küçük mesaj (boşsa görünmez)
+//   birakilinca      : kutuya dosya sürüklenip bırakılınca çağrılır
+function syllabusKutusunuCiz(kutu, { baslik, aciklama, bos, dugmeler, yukleniyor, hata, birakilinca }) {
+    kutu.classList.add("syllabus-kutusu");
+    kutu.classList.remove("suruklenen");
+    const satir = eleman("div", "ic-satir" + (bos ? " bos" : ""));
+    const yazi = eleman("div", "ic-satir-yazisi");
+    yazi.appendChild(eleman("strong", "", baslik));
+    if (aciklama) yazi.appendChild(eleman("small", "", aciklama));
+    satir.appendChild(yazi);
+    const alt = eleman("div", "syllabus-dugmeleri");
+    if (yukleniyor) {
+        alt.setAttribute("role", "status");
+        alt.append(eleman("span", "donen-halka"), eleman("span", "", "Yükleniyor..."));
+    } else {
+        alt.append(...dugmeler);
+    }
+    kutu.replaceChildren(satir, alt);
+    if (hata) kutu.appendChild(eleman("p", "kucuk-not hata-yazisi", hata));
+
+    // Sürükle-bırak: olaylar kutuya bir kez bağlanır, her çizimde sadece ne yapılacağı güncellenir.
+    kutu.birakilinca = yukleniyor ? null : birakilinca;
+    if (kutu.dataset.birakmaHazir) return;
+    kutu.dataset.birakmaHazir = "1";
+    kutu.addEventListener("dragover", (olay) => {
+        olay.preventDefault();   // tarayıcı dosyayı kendi açmasın
+        if (kutu.birakilinca) kutu.classList.add("suruklenen");
+    });
+    kutu.addEventListener("dragleave", () => kutu.classList.remove("suruklenen"));
+    kutu.addEventListener("drop", (olay) => {
+        olay.preventDefault();
+        kutu.classList.remove("suruklenen");
+        const dosya = olay.dataTransfer.files[0];
+        if (dosya && kutu.birakilinca) kutu.birakilinca(dosya);
+    });
+}
+
+// ---------- Ders formundaki syllabus alanı ----------
+// Seçilen dosya hemen yüklenmez: Kaydet'e basılınca (ders kaydedildikten sonra) derse eklenir.
+
+const formSyllabusKutusu = document.getElementById("form-syllabus");
+
+// Formdaki seçimi boşaltır; sunucuda bekleyen geçici dosya varsa onu da siler.
+function formSyllabusunuBosalt() {
+    geciciSyllabusuSil(formSyllabusu.gecici);
+    formSyllabusu = { dosya: null, gecici: null };
+}
+
+function formSyllabusunuCiz(hata = "") {
+    const sec = (dosya) => {
+        const dosyaHatasi = syllabusDosyaHatasi(dosya);
+        if (dosyaHatasi) {
+            formSyllabusunuCiz(dosyaHatasi);
+            return;
+        }
+        formSyllabusunuBosalt();
+        formSyllabusu.dosya = dosya;
+        formSyllabusunuCiz();
+    };
+    const dosyaSec = (yazi) => kucukDugme(yazi, () => syllabusDosyasiSectir(sec));
+    const kaldir = kucukDugme("Kaldır", () => {
+        formSyllabusunuBosalt();
+        formSyllabusunuCiz();
+    });
+    const ders = dersler.find((d) => d.id === duzenlenenDersId);
+    const bekleyen = formSyllabusu.dosya
+        ? { ad: formSyllabusu.dosya.name, boyut: formSyllabusu.dosya.size }
+        : formSyllabusu.gecici;
+    let icerik;
+    if (bekleyen) {
+        icerik = {
+            baslik: bekleyen.ad,
+            aciklama: `${boyutYazisi(bekleyen.boyut)} · Kaydet'e basınca derse eklenecek`
+                + (ders?.syllabus ? " (mevcut dosyanın yerine geçer)" : ""),
+            dugmeler: [dosyaSec("Değiştir"), kaldir],
+        };
+    } else if (ders?.syllabus) {
+        icerik = {
+            baslik: ders.syllabus.ad,
+            aciklama: `${zamaniGoster(ders.syllabus.tarih)} · ${boyutYazisi(ders.syllabus.boyut)}`,
+            dugmeler: [syllabusAcBaglantisi(ders.id), dosyaSec("Değiştir")],
+        };
+    } else {
+        icerik = {
+            baslik: "Henüz syllabus eklenmemiş",
+            aciklama: `PDF, PNG veya JPG · en fazla ${AYARLAR.syllabusEnFazlaMB} MB · dosyayı buraya da sürükleyebilirsin`,
+            bos: true,
+            dugmeler: [dosyaSec("Syllabus yükle")],
+        };
+    }
+    syllabusKutusunuCiz(formSyllabusKutusu, { ...icerik, hata, birakilinca: sec });
 }
 
 // Bir form alanını sarı işaretler; nedeni üzerine gelince görünür.
@@ -711,10 +904,14 @@ function satirEkle(sablonId, liste, veri = {}) {
 // TEK FORM BİLEŞENİ: ders formunu verilen başlangıç verisiyle açar.
 //   dersFormunuAc()                 -> boş form (elle ekleme)
 //   dersFormunuAc(ders)             -> kayıtlı dersi düzenleme (ders.id var)
-//   dersFormunuAc({kod: ..., ...}, uyarilar) -> syllabus'tan ön doldurulmuş yeni ders
-//       (uyarilar: formun üstündeki notta gösterilecek ek satırlar)
-function dersFormunuAc(baslangicVerisi = {}, syllabusUyarilari = null) {
+//   dersFormunuAc({kod: ..., ...}, uyarilar, gecici) -> syllabus'tan ön doldurulmuş yeni ders
+//       (uyarilar: formun üstündeki notta gösterilecek ek satırlar;
+//        gecici: okunan dosyanın sunucudaki geçici kaydı, Kaydet'e basınca derse bağlanır)
+function dersFormunuAc(baslangicVerisi = {}, syllabusUyarilari = null, geciciSyllabus = null) {
     duzenlenenDersId = baslangicVerisi.id ?? null;
+    formSyllabusunuBosalt();
+    formSyllabusu.gecici = geciciSyllabus;
+    formSyllabusunuCiz();
     pencereBasligi.textContent = duzenlenenDersId ? "Dersi düzenle" : "Ders ekle";
     silDugmesi.hidden = !duzenlenenDersId;
 
@@ -782,6 +979,15 @@ function formuOku() {
 // form geçerli değilse Kaydet butonunu pasif yapar.
 function formuDogrula() {
     let gecerli = true;
+
+    // Online oturumda derslik zorunlu değil; teori, lab ve türü seçilmemiş oturumda zorunlu.
+    for (const satir of oturumListesi.children) {
+        const derslik = satir.querySelector('[data-alan="derslik"]');
+        const online = satir.querySelector('[data-alan="tur"]').value === "online";
+        if (online) delete derslik.dataset.zorunlu;
+        else derslik.dataset.zorunlu = "";
+        derslik.placeholder = online ? "isteğe bağlı" : "B201";
+    }
 
     // 1) Tek tek alanlar: boş zorunlu alan, negatif ya da üst sınırı aşan sayı.
     form.querySelectorAll("input, select").forEach((alan) => {
@@ -882,13 +1088,42 @@ async function dersiKaydet() {
             }
             await istekGonder("PUT", `/api/dersler/${duzenlenenDersId}`, formuOku());
         } else {
-            await istekGonder("POST", "/api/dersler", formuOku());
+            const yeniDers = formuOku();
+            // "Syllabus ile ekle": sunucuda geçici duran dosya, dersle birlikte kalıcı olarak bağlanır.
+            const gecici = formSyllabusu.gecici;
+            if (gecici) Object.assign(yeniDers, { syllabus_gecici: gecici.kimlik, syllabus_ad: gecici.ad });
+            const sonuc = await istekGonder("POST", "/api/dersler", yeniDers);
+            // Ders artık kayıtlı: bundan sonraki bir hata formu "düzenleme" olarak açık bırakır
+            // (yeniden Kaydet'e basılırsa aynı ders ikinci kez eklenmesin).
+            duzenlenenDersId = sonuc.id;
+            formSyllabusu.gecici = null;
+            if (sonuc.syllabus_hatasi) throw new Error(sonuc.syllabus_hatasi);
         }
-        pencere.close();
-        await dersleriYukle();
     } catch (hata) {
         mesajGoster(kayitHatasi, hata.message);
+        if (duzenlenenDersId) await dersleriYukle();
+        return;
     }
+    // Formda seçilen syllabus dosyası ders kaydedildikten sonra yüklenir.
+    if (formSyllabusu.dosya) {
+        kaydetDugmesi.disabled = true;
+        syllabusKutusunuCiz(formSyllabusKutusu, {
+            baslik: formSyllabusu.dosya.name, aciklama: boyutYazisi(formSyllabusu.dosya.size), yukleniyor: true,
+        });
+        try {
+            await syllabusYukle(duzenlenenDersId, formSyllabusu.dosya);
+        } catch (hata) {
+            await dersleriYukle();
+            pencereBasligi.textContent = "Dersi düzenle";
+            silDugmesi.hidden = false;
+            kaydetDugmesi.disabled = false;
+            formSyllabusunuCiz(`Ders kaydedildi ama syllabus yüklenemedi: ${hata.message}`);
+            return;
+        }
+        formSyllabusu.dosya = null;
+    }
+    pencere.close();
+    await dersleriYukle();
 }
 
 async function dersiSil() {
@@ -928,8 +1163,13 @@ birakmaAlani.addEventListener("drop", (olay) => {
     const dosya = olay.dataTransfer.files[0];
     if (dosya) syllabusOku(dosya);
 });
-// Pencere kapanınca süren okuma yok sayılır.
-pencere.addEventListener("close", () => { okumaNo++; });
+// Pencere kapanınca süren okuma yok sayılır; kaydedilmemiş syllabus seçimi (ve sunucudaki
+// geçici dosyası) bırakılır. Sayfa kapanırken de aynısı yapılır.
+pencere.addEventListener("close", () => {
+    okumaNo++;
+    formSyllabusunuBosalt();
+});
+window.addEventListener("pagehide", formSyllabusunuBosalt);
 document.getElementById("pencere-kapat").addEventListener("click", () => pencere.close());
 document.getElementById("vazgec-dugmesi").addEventListener("click", () => pencere.close());
 silDugmesi.addEventListener("click", dersiSil);
@@ -1178,6 +1418,8 @@ function dersPaneliniCiz(notlariYukle) {
         notZamaniniGoster(ders.id);
     }
     sekmeyiGoster(seciliSekme);
+    if (notlariYukle) syllabusIslemi = { dersId: ders.id, yukleniyor: false, hata: "" };
+    syllabusKartiniCiz(ders);
     kalemListesiniCiz(ders);
     hesabiCiz(ders);
     devamsizligiCiz(ders);
@@ -1486,6 +1728,53 @@ function kalemSatiriniVurgula(kalemId) {
 }
 
 // ---------- Sekme: Notlar ----------
+
+// "Syllabus" bölümü: dersin saklanan dosyası. Aç (yeni sekmede), Değiştir, Sil; dosya yoksa yükleme.
+// Buradaki işlemler hemen yapılır (ders formundaki gibi Kaydet beklenmez).
+const syllabusKarti = document.getElementById("syllabus-karti");
+let syllabusIslemi = { dersId: null, yukleniyor: false, hata: "" };   // süren yükleme/silme ve son hata
+
+function syllabusKartiniCiz(ders) {
+    const dersId = ders.id;
+    // İşlemi yapar; bitince dersleri yeniden yükler (kart yeni durumla çizilir). Hata kartta kırmızı görünür.
+    const islem = async (is) => {
+        syllabusIslemi = { dersId, yukleniyor: true, hata: "" };
+        syllabusKartiniCiz(ders);
+        let hata = "";
+        try {
+            await is();
+        } catch (yakalanan) {
+            hata = yakalanan.message;
+        }
+        // Bu arada başka derse geçildiyse o dersin kartına dokunma.
+        if (syllabusIslemi.dersId === dersId) syllabusIslemi = { dersId, yukleniyor: false, hata };
+        await dersleriYukle();
+    };
+    const yukle = (dosya) => islem(() => syllabusYukle(dersId, dosya));
+    const dosyaSec = (yazi) => kucukDugme(yazi, () => syllabusDosyasiSectir(yukle));
+    const durum = syllabusIslemi.dersId === dersId ? syllabusIslemi : { yukleniyor: false, hata: "" };
+    let icerik;
+    if (ders.syllabus) {
+        const sil = kucukDugme("Sil", () => {
+            if (!confirm(`"${ders.syllabus.ad}" silinsin mi? Bu işlem geri alınamaz.`)) return;
+            islem(() => istekGonder("DELETE", `/api/dersler/${dersId}/syllabus`));
+        }, "tehlikeli");
+        icerik = {
+            baslik: ders.syllabus.ad,
+            aciklama: `${zamaniGoster(ders.syllabus.tarih)} · ${boyutYazisi(ders.syllabus.boyut)}`,
+            dugmeler: [syllabusAcBaglantisi(dersId), dosyaSec("Değiştir"), sil],
+        };
+    } else {
+        icerik = {
+            baslik: "Henüz syllabus eklenmemiş",
+            aciklama: "Dosya yok · PDF, PNG veya JPG dosyasını buraya sürükleyebilirsin",
+            bos: true,
+            dugmeler: [dosyaSec("Syllabus yükle")],
+        };
+    }
+    syllabusKutusunuCiz(syllabusKarti, { ...icerik, yukleniyor: durum.yukleniyor, hata: durum.hata, birakilinca: yukle });
+}
+
 // Yazmayı bıraktıktan yaklaşık 1 saniye sonra kendiliğinden kaydedilir. Kartın sağ üstündeki rozet
 // kayıt durumunu gösterir: "Kaydedildi", "Yazılıyor..." ya da "Kaydedilemedi".
 
@@ -1586,7 +1875,8 @@ function bilgiyiCiz(ders) {
             oturumlar.govde.appendChild(icSatir({
                 sol: dersKaresi(ders),
                 baslik: GUN_ADLARI[oturum.gun],
-                aciklama: `${oturum.baslangic} – ${oturum.bitis} · ${oturum.derslik}`,
+                // Online oturumda derslik boş olabilir.
+                aciklama: [`${oturum.baslangic} – ${oturum.bitis}`, oturum.derslik].filter(Boolean).join(" · "),
                 sag: oturum.tur ? hapRozet(oturum.tur, "soluk") : null,
             }));
         }

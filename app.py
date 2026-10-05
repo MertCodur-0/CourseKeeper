@@ -3,10 +3,12 @@ import os
 import re
 import shutil
 import sqlite3
+import time
+import uuid
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_file
 from werkzeug.exceptions import RequestEntityTooLarge
 
 import akademik_takvim
@@ -23,6 +25,24 @@ ENV_DOSYASI = PROJE_KLASORU / ".env"
 
 # Syllabus olarak kabul edilen en büyük dosya.
 SYLLABUS_EN_FAZLA_MB = 20
+
+# Derslerin syllabus dosyaları burada saklanır (kişisel veri: .gitignore'da, git'e girmez).
+# Klasör yoksa kod oluşturur. Dosyalar rastgele bir adla durur; kullanıcının verdiği ad
+# sadece veritabanında, göstermek için tutulur.
+SYLLABUS_KLASORU = PROJE_KLASORU / "uploads" / "syllabus"
+# "Syllabus ile ekle" akışında okunan dosya, ders kaydedilene kadar burada bekler.
+GECICI_SYLLABUS_KLASORU = SYLLABUS_KLASORU / "gecici"
+# Kaydedilmeden bırakılan geçici dosya bu kadar saat sonra (sunucu açılırken) silinir.
+GECICI_SYLLABUS_SAAT = 24
+# Kabul edilen dosya türleri: {içerik türü: izin verilen uzantılar}. İlk uzantı, saklanan dosyanınkidir.
+SYLLABUS_TURLERI = {
+    "application/pdf": [".pdf"],
+    "image/png": [".png"],
+    "image/jpeg": [".jpg", ".jpeg"],
+}
+# Saklanan dosya adı (uuid + uzantı) ve geçici dosyanın kimliği (uuid) sadece bu biçimde olabilir.
+SYLLABUS_DOSYA_KALIBI = re.compile(r"^[0-9a-f]{32}\.(pdf|png|jpg)$")
+GECICI_KIMLIK_KALIBI = re.compile(r"^[0-9a-f]{32}$")
 
 # 5000 portunu Mac'te AirPlay kullandığı için 5001'i seçtik.
 PORT = 5001
@@ -153,7 +173,10 @@ DERS_DISI_TURLERI = [
 OTURUM_TURLERI = [
     {"anahtar": "teori", "ad": "Teori"},
     {"anahtar": "lab", "ad": "Lab"},
+    {"anahtar": "online", "ad": "Online"},
 ]
+# Dersliği zorunlu olmayan oturum türü. Devamsızlıkta online oturumlar teoriyle aynı (ana) havuzdadır.
+ONLINE_TURU = "online"
 
 # Değerlendirme kalemi türleri: sabit liste, sadece burada tanımlı.
 # Bir derste her tür en fazla bir kez kullanılır, yani tür o kalemi tek başına tanımlar.
@@ -272,7 +295,13 @@ def veritabani_hazirla():
             hedef_not         TEXT,               -- "AA", "BA" ... (eski derslerde boş olabilir)
             devamsizlik_metni TEXT,               -- formda yok: syllabus'ta yüzde olarak yazmayan devamsızlık kuralı
             sinav_rengi       TEXT,               -- sınav bloklarının rengi (RENKLER anahtarı)
-            gpaya_dahil       INTEGER NOT NULL DEFAULT 1  -- 0: ders GPA hesabına katılmaz
+            gpaya_dahil       INTEGER NOT NULL DEFAULT 1, -- 0: ders GPA hesabına katılmaz
+            -- Dersin syllabus dosyası (en fazla bir tane; yoksa hepsi boş).
+            syllabus_dosya        TEXT,           -- uploads/syllabus içindeki rastgele ad (uuid + uzantı)
+            syllabus_orijinal_ad  TEXT,           -- kullanıcının dosya adı (sadece göstermek için)
+            syllabus_boyut        INTEGER,        -- bayt
+            syllabus_tarih        TEXT,           -- yüklenme zamanı, "2026-10-05T14:30"
+            syllabus_tur          TEXT            -- içerik türü (SYLLABUS_TURLERI anahtarı)
         );
 
         -- Bir dersin haftalık saatleri. Bir dersin birden çok oturumu olabilir.
@@ -282,8 +311,8 @@ def veritabani_hazirla():
             gun       INTEGER NOT NULL,           -- 0 = Pzt ... 6 = Paz
             baslangic TEXT NOT NULL,              -- "09:00"
             bitis     TEXT NOT NULL,              -- "11:00"
-            derslik   TEXT NOT NULL,
-            tur       TEXT                        -- teori / lab
+            derslik   TEXT NOT NULL,              -- online oturumda boş ("") olabilir
+            tur       TEXT                        -- teori / lab / online
         );
 
         -- Vize, final, ödev gibi not kalemleri. İleride not hesabı bunlardan yapılacak.
@@ -375,6 +404,12 @@ def veritabani_guncelle(baglanti):
     # Mevcut bütün dersler GPA'ya dahil (1) sayılır.
     sutun_yoksa_ekle(baglanti, "dersler", "gpaya_dahil", "INTEGER NOT NULL DEFAULT 1")
     sutun_yoksa_ekle(baglanti, "dersler", "lab_devamsizlik_hakki", "REAL")
+    # Mevcut derslerde syllabus alanları boş kalır (dosyası yok).
+    sutun_yoksa_ekle(baglanti, "dersler", "syllabus_dosya")
+    sutun_yoksa_ekle(baglanti, "dersler", "syllabus_orijinal_ad")
+    sutun_yoksa_ekle(baglanti, "dersler", "syllabus_boyut", "INTEGER")
+    sutun_yoksa_ekle(baglanti, "dersler", "syllabus_tarih")
+    sutun_yoksa_ekle(baglanti, "dersler", "syllabus_tur")
 
     silinenler = []
     # "with baglanti": içindeki işlemler tek seferde kaydedilir, hata olursa hiçbiri kaydedilmez.
@@ -565,6 +600,11 @@ def dersleri_getir(baglanti):
     dersler = [dict(satir) for satir in baglanti.execute("SELECT * FROM dersler ORDER BY id")]
     for ders in dersler:
         ders["gpaya_dahil"] = bool(ders["gpaya_dahil"])
+        # Syllabus: diskteki dosya adı dışarı verilmez; sadece gösterilecek bilgiler (dosya yoksa None).
+        dosya = ders.pop("syllabus_dosya")
+        bilgi = {"ad": ders.pop("syllabus_orijinal_ad"), "boyut": ders.pop("syllabus_boyut"),
+                 "tarih": ders.pop("syllabus_tarih"), "tur": ders.pop("syllabus_tur")}
+        ders["syllabus"] = bilgi if dosya else None
         ders["oturumlar"] = [dict(satir) for satir in baglanti.execute(
             "SELECT id, gun, baslangic, bitis, derslik, tur FROM oturumlar"
             " WHERE ders_id = ? ORDER BY gun, baslangic",
@@ -740,10 +780,11 @@ def dersi_dogrula(veri):
         # "09:00" < "11:00" karşılaştırması metin olarak da doğru çalışır.
         if bitis <= baslangic:
             return None, "Bitiş saati başlangıçtan sonra olmalı."
-        if not derslik:
-            return None, "Her oturum için derslik zorunlu."
         if tur is not None and tur not in oturum_turleri:
             return None, "Geçersiz oturum türü."
+        # Online oturumda derslik zorunlu değil (boş kalabilir); teori ve lab'da zorunlu.
+        if not derslik and tur != ONLINE_TURU:
+            return None, "Teori ve lab oturumlarında derslik zorunlu."
         oturumlar.append({"id": satir_kimligi(oturum), "gun": gun, "baslangic": baslangic,
                           "bitis": bitis, "derslik": derslik, "tur": tur})
     if not oturumlar:
@@ -1063,7 +1104,8 @@ def api_dersleri_listele():
 
 @app.route("/api/dersler", methods=["POST"])
 def api_ders_ekle():
-    ders, hata = dersi_dogrula(request.get_json(silent=True) or {})
+    veri = request.get_json(silent=True) or {}
+    ders, hata = dersi_dogrula(veri)
     if hata:
         return jsonify({"hata": hata}), 400
     baglanti = veritabani_baglan()
@@ -1073,7 +1115,17 @@ def api_ders_ekle():
     with baglanti:
         ders_id = dersi_kaydet(baglanti, ders)
     baglanti.close()
-    return jsonify({"id": ders_id}), 201
+    sonuc = {"id": ders_id}
+    # "Syllabus ile ekle" akışı: okunurken geçici saklanan dosya artık derse kalıcı olarak bağlanır.
+    if veri.get("syllabus_gecici"):
+        try:
+            baglandi = gecici_syllabusu_derse_bagla(ders_id, veri.get("syllabus_gecici"), veri.get("syllabus_ad"))
+        except OSError:
+            baglandi = False
+        if not baglandi:
+            sonuc["syllabus_hatasi"] = ("Ders kaydedildi ama syllabus dosyası eklenemedi. "
+                                        "Notlar sekmesinden yeniden yükleyebilirsin.")
+    return jsonify(sonuc), 201
 
 
 @app.route("/api/dersler/<int:ders_id>", methods=["PUT"])
@@ -1519,6 +1571,209 @@ def api_hedef_notlarini_kaydet():
 
 
 # ============================================================
+# SYLLABUS DOSYALARI (diskte saklama)
+# ============================================================
+# Güvenlik: diskteki yol hiçbir zaman kullanıcıdan gelen metinle kurulmaz. Dosya adı sunucuda
+# üretilir (uuid + uzantı), veritabanından okunur ve kullanılmadan önce kalıba uyduğu kontrol edilir.
+
+BOYUT_MESAJI = f"Dosya çok büyük. En fazla {SYLLABUS_EN_FAZLA_MB} MB'lık dosya yükleyebilirsin."
+TUR_MESAJI = "Bu dosya türü desteklenmiyor. Lütfen PDF, PNG veya JPG dosyası seç."
+
+
+def gosterilecek_ad(ad):
+    """Kullanıcının dosya adını sadece göstermek için sadeleştirir (klasör kısmı ve denetim karakterleri atılır)."""
+    ad = metin(ad).replace("\\", "/").split("/")[-1]
+    ad = "".join(harf for harf in ad if harf.isprintable()).strip()
+    return ad[:200] or "syllabus"
+
+
+def syllabus_dosyasini_oku(dosya):
+    """Yüklenen dosyayı okur ve kontrol eder: (içerik, içerik türü, gösterilecek ad) döndürür.
+
+    Kurallar: en fazla SYLLABUS_EN_FAZLA_MB; uzantı PDF/PNG/JPG/JPEG olmalı ve dosyanın ilk
+    baytları (gerçek türü) uzantısıyla uyuşmalı. Uygun değilse SyllabusHatasi fırlatır.
+    """
+    if dosya is None or not dosya.filename:
+        raise SyllabusHatasi("Dosya seçilmedi.")
+    en_fazla = SYLLABUS_EN_FAZLA_MB * 1024 * 1024
+    try:
+        icerik = dosya.read(en_fazla + 1)
+    finally:
+        dosya.close()
+    if len(icerik) > en_fazla:
+        raise SyllabusHatasi(BOYUT_MESAJI)
+    ad = gosterilecek_ad(dosya.filename)
+    uzanti = Path(ad).suffix.lower()
+    if not any(uzanti in uzantilar for uzantilar in SYLLABUS_TURLERI.values()):
+        raise SyllabusHatasi(TUR_MESAJI)
+    mime_turu = dosya_turunu_bul(icerik)
+    if mime_turu is None or uzanti not in SYLLABUS_TURLERI[mime_turu]:
+        raise SyllabusHatasi(
+            "Dosyanın içeriği uzantısıyla uyuşmuyor (bozuk ya da farklı türde bir dosya). "
+            "Lütfen gerçek bir PDF, PNG veya JPG dosyası seç.")
+    return icerik, mime_turu, ad
+
+
+def dosyayi_sil(yol):
+    """Dosyayı siler; dosya yoksa ya da silinemezse sessizce geçer."""
+    try:
+        if yol is not None:
+            yol.unlink()
+    except OSError:
+        pass
+
+
+def syllabus_yolu(dosya_adi):
+    """Veritabanındaki dosya adından diskteki yolu verir. Ad beklenen biçimde değilse None."""
+    if not isinstance(dosya_adi, str) or not SYLLABUS_DOSYA_KALIBI.match(dosya_adi):
+        return None
+    return SYLLABUS_KLASORU / dosya_adi
+
+
+def gecici_syllabus_yolu(kimlik):
+    """Geçici syllabus dosyasını kimliğinden (uuid) bulur. Kimlik geçersizse ya da dosya yoksa None."""
+    if not isinstance(kimlik, str) or not GECICI_KIMLIK_KALIBI.match(kimlik):
+        return None
+    for uzantilar in SYLLABUS_TURLERI.values():
+        yol = GECICI_SYLLABUS_KLASORU / (kimlik + uzantilar[0])
+        if yol.is_file():
+            return yol
+    return None
+
+
+def syllabus_diske_yaz(icerik, mime_turu, klasor):
+    """İçeriği klasöre rastgele bir adla yazar (klasör yoksa oluşturur). Dosyanın kimliğini (uuid) döndürür."""
+    klasor.mkdir(parents=True, exist_ok=True)
+    kimlik = uuid.uuid4().hex
+    (klasor / (kimlik + SYLLABUS_TURLERI[mime_turu][0])).write_bytes(icerik)
+    return kimlik
+
+
+def derse_syllabus_bagla(ders_id, dosya_adi, orijinal_ad, boyut, mime_turu):
+    """Diske yazılmış dosyayı derse bağlar; dersin eski dosyası varsa diskten siler.
+
+    Ders bulunamazsa False döner (yeni dosyayı silmek çağırana kalır).
+    """
+    baglanti = veritabani_baglan()
+    eski = baglanti.execute("SELECT syllabus_dosya FROM dersler WHERE id = ?", (ders_id,)).fetchone()
+    if eski is None:
+        baglanti.close()
+        return False
+    with baglanti:
+        baglanti.execute(
+            "UPDATE dersler SET syllabus_dosya = ?, syllabus_orijinal_ad = ?, syllabus_boyut = ?,"
+            " syllabus_tarih = ?, syllabus_tur = ? WHERE id = ?",
+            (dosya_adi, orijinal_ad, boyut, simdi().strftime("%Y-%m-%dT%H:%M"), mime_turu, ders_id),
+        )
+    baglanti.close()
+    if eski["syllabus_dosya"] != dosya_adi:
+        dosyayi_sil(syllabus_yolu(eski["syllabus_dosya"]))
+    return True
+
+
+def gecici_syllabusu_derse_bagla(ders_id, kimlik, orijinal_ad):
+    """ "Syllabus ile ekle" akışında bekleyen geçici dosyayı kalıcı klasöre taşır ve derse bağlar.
+
+    Dosya bulunamazsa (ör. süresi dolup silinmişse) False döner; ders yine de kaydedilmiş olur.
+    """
+    gecici = gecici_syllabus_yolu(kimlik)
+    if gecici is None:
+        return False
+    with open(gecici, "rb") as dosya:
+        mime_turu = dosya_turunu_bul(dosya.read(16))
+    if mime_turu is None:
+        dosyayi_sil(gecici)
+        return False
+    SYLLABUS_KLASORU.mkdir(parents=True, exist_ok=True)
+    dosya_adi = uuid.uuid4().hex + SYLLABUS_TURLERI[mime_turu][0]
+    boyut = gecici.stat().st_size
+    os.replace(gecici, SYLLABUS_KLASORU / dosya_adi)
+    if not derse_syllabus_bagla(ders_id, dosya_adi, gosterilecek_ad(orijinal_ad), boyut, mime_turu):
+        dosyayi_sil(SYLLABUS_KLASORU / dosya_adi)
+        return False
+    return True
+
+
+def eski_gecici_dosyalari_sil():
+    """Kaydedilmeden bırakılmış (pencere/sayfa kapatılmış) eski geçici syllabus dosyalarını siler."""
+    if not GECICI_SYLLABUS_KLASORU.is_dir():
+        return
+    sinir = time.time() - GECICI_SYLLABUS_SAAT * 3600
+    for yol in GECICI_SYLLABUS_KLASORU.iterdir():
+        try:
+            if yol.is_file() and yol.stat().st_mtime < sinir:
+                yol.unlink()
+        except OSError:
+            pass
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def cok_buyuk_istek(hata):
+    """Sınırı aşan yükleme: Flask'ın İngilizce sayfası yerine Türkçe mesaj."""
+    return jsonify({"hata": BOYUT_MESAJI}), 413
+
+
+@app.route("/api/dersler/<int:ders_id>/syllabus", methods=["GET"])
+def api_syllabusu_ac(ders_id):
+    """Dersin syllabus dosyasını tarayıcıda açılacak şekilde sunar (dosya, ders kimliğinden bulunur)."""
+    baglanti = veritabani_baglan()
+    satir = baglanti.execute(
+        "SELECT syllabus_dosya, syllabus_orijinal_ad, syllabus_tur FROM dersler WHERE id = ?", (ders_id,)
+    ).fetchone()
+    baglanti.close()
+    yol = syllabus_yolu(satir["syllabus_dosya"]) if satir else None
+    if yol is None or not yol.is_file() or satir["syllabus_tur"] not in SYLLABUS_TURLERI:
+        return jsonify({"hata": "Bu dersin syllabus dosyası yok."}), 404
+    yanit = send_file(yol, mimetype=satir["syllabus_tur"], as_attachment=False,
+                      download_name=satir["syllabus_orijinal_ad"] or "syllabus", max_age=0)
+    # Tarayıcı içeriğe bakıp türü kendi tahmin etmesin; dosya değişince eskisi gösterilmesin.
+    yanit.headers["X-Content-Type-Options"] = "nosniff"
+    yanit.headers["Cache-Control"] = "no-store"
+    return yanit
+
+
+@app.route("/api/dersler/<int:ders_id>/syllabus", methods=["POST"])
+def api_syllabusu_yukle(ders_id):
+    """Derse syllabus dosyası yükler ya da mevcut dosyayı değiştirir (eskisi diskten silinir)."""
+    try:
+        icerik, mime_turu, ad = syllabus_dosyasini_oku(request.files.get("dosya"))
+    except SyllabusHatasi as hata:
+        return jsonify({"hata": str(hata)}), 400
+    try:
+        dosya_adi = syllabus_diske_yaz(icerik, mime_turu, SYLLABUS_KLASORU) + SYLLABUS_TURLERI[mime_turu][0]
+    except OSError:
+        return jsonify({"hata": "Dosya kaydedilemedi. Diskte yer olduğundan emin olup tekrar dene."}), 500
+    if not derse_syllabus_bagla(ders_id, dosya_adi, ad, len(icerik), mime_turu):
+        dosyayi_sil(SYLLABUS_KLASORU / dosya_adi)
+        return jsonify({"hata": "Ders bulunamadı."}), 404
+    return jsonify({"kaydedildi": True}), 201
+
+
+@app.route("/api/dersler/<int:ders_id>/syllabus", methods=["DELETE"])
+def api_syllabusu_sil(ders_id):
+    """Dersin syllabus dosyasını diskten ve dersten siler."""
+    baglanti = veritabani_baglan()
+    satir = baglanti.execute("SELECT syllabus_dosya FROM dersler WHERE id = ?", (ders_id,)).fetchone()
+    if satir is None:
+        baglanti.close()
+        return jsonify({"hata": "Ders bulunamadı."}), 404
+    with baglanti:
+        baglanti.execute(
+            "UPDATE dersler SET syllabus_dosya = NULL, syllabus_orijinal_ad = NULL, syllabus_boyut = NULL,"
+            " syllabus_tarih = NULL, syllabus_tur = NULL WHERE id = ?", (ders_id,))
+    baglanti.close()
+    dosyayi_sil(syllabus_yolu(satir["syllabus_dosya"]))
+    return jsonify({"silindi": True})
+
+
+@app.route("/api/syllabus/gecici/<kimlik>", methods=["DELETE"])
+def api_gecici_syllabusu_sil(kimlik):
+    """ "Syllabus ile ekle" akışından vazgeçilince bekleyen geçici dosyayı siler."""
+    dosyayi_sil(gecici_syllabus_yolu(kimlik))
+    return jsonify({"silindi": True})
+
+
+# ============================================================
 # SYLLABUS API'si
 # ============================================================
 
@@ -1526,37 +1781,29 @@ def api_hedef_notlarini_kaydet():
 def api_syllabus_oku():
     """Yüklenen syllabus'u (PDF/PNG/JPG) okur, ders formunu ön dolduracak veriyi döndürür.
 
-    Hiçbir şey kaydetmez: ders ancak kullanıcı formu kontrol edip Kaydet'e basınca eklenir.
-    Dosya saklanmaz: içerik bellekte işlenir. (Büyük yüklemelerde Flask'ın kullandığı geçici
-    dosya da istek bitince kendiliğinden silinir.)
+    Ders kaydedilmez: ders ancak kullanıcı formu kontrol edip Kaydet'e basınca eklenir.
+    Okuma başarılıysa dosya GEÇİCİ olarak saklanır ve kimliği "gecici" alanında döner; ders
+    kaydedilince derse bağlanır (api_ders_ekle), vazgeçilince silinir (api_gecici_syllabusu_sil).
     Her hata {"hata": mesaj} olarak döner; uygulama çökmez.
     """
-    en_fazla = SYLLABUS_EN_FAZLA_MB * 1024 * 1024
-    boyut_mesaji = f"Dosya çok büyük. En fazla {SYLLABUS_EN_FAZLA_MB} MB'lık dosya yükleyebilirsin."
     try:
-        dosya = request.files.get("dosya")
-        if dosya is None:
-            raise SyllabusHatasi("Dosya seçilmedi.")
-        try:
-            icerik = dosya.read(en_fazla + 1)
-        finally:
-            dosya.close()
-        if len(icerik) > en_fazla:
-            raise SyllabusHatasi(boyut_mesaji)
-        mime_turu = dosya_turunu_bul(icerik)
-        if mime_turu is None:
-            raise SyllabusHatasi("Bu dosya türü desteklenmiyor. Lütfen PDF, PNG veya JPG dosyası seç.")
+        icerik, mime_turu, ad = syllabus_dosyasini_oku(request.files.get("dosya"))
         ham = syllabus.parser_olustur(ENV_DOSYASI).oku(icerik, mime_turu)
         ders, uyarilar = syllabus_forma_cevir(ham)
     except SyllabusHatasi as hata:
         return jsonify({"hata": str(hata)}), 400
     except RequestEntityTooLarge:
-        return jsonify({"hata": boyut_mesaji}), 413
+        return jsonify({"hata": BOYUT_MESAJI}), 413
     except Exception as hata:
         # Beklenmeyen hata: ayrıntı (ve olası gizli bilgi) kullanıcıya ya da kayda yazılmaz.
         app.logger.error("Syllabus okunurken beklenmeyen hata: %s", type(hata).__name__)
         return jsonify({"hata": "Syllabus okunurken beklenmeyen bir hata oluştu."}), 500
-    return jsonify({"ders": ders, "uyarilar": uyarilar})
+    try:
+        gecici = {"kimlik": syllabus_diske_yaz(icerik, mime_turu, GECICI_SYLLABUS_KLASORU),
+                  "ad": ad, "boyut": len(icerik)}
+    except OSError:
+        gecici = None   # dosya saklanamadı: okunan bilgiler yine de forma gelir
+    return jsonify({"ders": ders, "uyarilar": uyarilar, "gecici": gecici})
 
 
 @app.route("/api/akademik-takvim", methods=["POST"])
@@ -1612,15 +1859,20 @@ def api_akademik_takvimi_oku():
 @app.route("/api/dersler/<int:ders_id>", methods=["DELETE"])
 def api_ders_sil(ders_id):
     baglanti = veritabani_baglan()
+    satir = baglanti.execute("SELECT syllabus_dosya FROM dersler WHERE id = ?", (ders_id,)).fetchone()
     with baglanti:
         # Oturumlar ve değerlendirme kalemleri de birlikte silinir (ON DELETE CASCADE).
         baglanti.execute("DELETE FROM dersler WHERE id = ?", (ders_id,))
     baglanti.close()
+    # Dersin syllabus dosyası da diskten silinir.
+    if satir is not None:
+        dosyayi_sil(syllabus_yolu(satir["syllabus_dosya"]))
     return jsonify({"silindi": True})
 
 
 if __name__ == "__main__":
     veritabani_hazirla()
+    eski_gecici_dosyalari_sil()
     # Geliştirici modu (kod değişince sunucu kendini yeniler, hata ayrıntısı gösterir) varsayılan olarak açık.
     # Mac uygulaması (CourseKeeper.app) günlük kullanım için COURSEKEEPER_DEBUG=0 ile kapatır.
     gelistirici_modu = os.environ.get("COURSEKEEPER_DEBUG", "1") != "0"
