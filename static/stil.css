@@ -1830,6 +1830,11 @@ body {
     width: 84px;
 }
 
+/* GPA tablosunda ders kodunun yanındaki rozet (Tekrar · eski XX) */
+#gpa-tablosu .hap {
+    margin-left: 8px;
+}
+
 /* Hesaba girmeyen dersin küçük sarı uyarısı (AKTS girilmemiş, hedef harf seçilmemiş) */
 .satir-uyarisi {
     display: inline-block;

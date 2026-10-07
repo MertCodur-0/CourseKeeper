@@ -119,6 +119,8 @@ NOT_OLCEGI = [
 ]
 # Hedef olarak seçilebilen notlar: F dışındakiler (AA ... DD).
 HEDEF_NOTLARI = [satir["harf"] for satir in NOT_OLCEGI if satir["katsayi"] > 0]
+# Tekrar alınan dersin eski notu olabilecek harfler (F = kalınan ders). Puanları NOT_OLCEGI'nden gelir.
+ESKI_NOTLAR = ["DC", "DD", "F"]
 
 # Puan bir harfin alt sınırıyla karşılaştırılmadan önce nasıl yuvarlanır?
 #   "none"    : yuvarlama yok (89.99, 90 sayılmaz)
@@ -410,6 +412,8 @@ def veritabani_guncelle(baglanti):
     sutun_yoksa_ekle(baglanti, "dersler", "syllabus_boyut", "INTEGER")
     sutun_yoksa_ekle(baglanti, "dersler", "syllabus_tarih")
     sutun_yoksa_ekle(baglanti, "dersler", "syllabus_tur")
+    # Tekrar alınan dersin eski harf notu (boş = ders ilk kez alınıyor). GPA hesabında kullanılır.
+    sutun_yoksa_ekle(baglanti, "dersler", "tekrar_eski_not")
 
     silinenler = []
     # "with baglanti": içindeki işlemler tek seferde kaydedilir, hata olursa hiçbiri kaydedilmez.
@@ -667,7 +671,7 @@ def alt_satirlari_esitle(baglanti, tablo, sutunlar, ders_id, satirlar):
 def dersi_kaydet(baglanti, ders, ders_id=None):
     """Dersi ekler (ders_id yoksa) veya günceller. Dersin kimliğini döndürür.
 
-    "notlar" ve "gpaya_dahil" sütunlarına ve kalemlerin "alinan_puan" değerine dokunulmaz (formda yoklar, sağ panelden
+    "notlar", "gpaya_dahil" ve "tekrar_eski_not" sütunlarına ve kalemlerin "alinan_puan" değerine dokunulmaz (formda yoklar, sağ panelden
     yazılırlar; mevcut değerler aynen kalır).
     "devamsizlik_metni" sadece ders eklenirken yazılır (syllabus'tan gelir), güncellemede aynen kalır.
     """
@@ -1077,6 +1081,7 @@ def ana_sayfa():
             "degerlendirmeTurleri": DEGERLENDIRME_TURLERI,
             "syllabusEnFazlaMB": SYLLABUS_EN_FAZLA_MB,
             "notOlcegi": NOT_OLCEGI,
+            "eskiNotlar": ESKI_NOTLAR,
             "yuzUzerindenTurler": YUZ_UZERINDEN_TURLER,
             "roundMode": ROUND_MODE,
             "gpaRounding": GPA_ROUNDING,
@@ -1537,16 +1542,32 @@ def api_gpa_ayarlarini_kaydet():
 
 @app.route("/api/dersler/<int:ders_id>/gpa", methods=["PUT"])
 def api_gpaya_dahili_kaydet(ders_id):
-    """Dersin GPA hesabına katılıp katılmayacağını kaydeder."""
+    """Dersin GPA ekranından yazılan ayarlarını kaydeder (sadece gönderilen alan değişir).
+
+    gpaya_dahil     : ders GPA hesabına katılsın mı?
+    tekrar_eski_not : tekrar alınan dersin eski harf notu (boş = ders ilk kez alınıyor)
+    """
     veri = request.get_json(silent=True) or {}
-    dahil = 1 if veri.get("gpaya_dahil") is True else 0
+    degisenler = {}
+    if "gpaya_dahil" in veri:
+        degisenler["gpaya_dahil"] = 1 if veri["gpaya_dahil"] is True else 0
+    if "tekrar_eski_not" in veri:
+        eski_not = metin(veri["tekrar_eski_not"]) or None
+        if eski_not is not None and eski_not not in ESKI_NOTLAR:
+            return jsonify({"hata": "Eski not geçersiz."}), 400
+        degisenler["tekrar_eski_not"] = eski_not
+    if not degisenler:
+        return jsonify({"hata": "Kaydedilecek bir değer yok."}), 400
     baglanti = veritabani_baglan()
     with baglanti:
-        imlec = baglanti.execute("UPDATE dersler SET gpaya_dahil = ? WHERE id = ?", (dahil, ders_id))
+        atamalar = ", ".join(f"{sutun} = ?" for sutun in degisenler)   # sütun adları yukarıda sabit
+        imlec = baglanti.execute(f"UPDATE dersler SET {atamalar} WHERE id = ?", [*degisenler.values(), ders_id])
     baglanti.close()
     if imlec.rowcount == 0:
         return jsonify({"hata": "Ders bulunamadı."}), 404
-    return jsonify({"gpaya_dahil": bool(dahil)})
+    if "gpaya_dahil" in degisenler:
+        degisenler["gpaya_dahil"] = bool(degisenler["gpaya_dahil"])
+    return jsonify(degisenler)
 
 
 @app.route("/api/hedef-notlari", methods=["PUT"])
@@ -1873,6 +1894,7 @@ def api_ders_sil(ders_id):
 if __name__ == "__main__":
     veritabani_hazirla()
     eski_gecici_dosyalari_sil()
+
     # Geliştirici modu (kod değişince sunucu kendini yeniler, hata ayrıntısı gösterir) varsayılan olarak açık.
     # Mac uygulaması (CourseKeeper.app) günlük kullanım için COURSEKEEPER_DEBUG=0 ile kapatır.
     gelistirici_modu = os.environ.get("COURSEKEEPER_DEBUG", "1") != "0"

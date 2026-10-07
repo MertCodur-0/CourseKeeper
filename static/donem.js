@@ -508,16 +508,35 @@ function gecerliHarf(ders) {
     return hedefHarfleri().find((satir) => satir.harf === harf) || null;
 }
 
+// Eski not olarak seçilebilen harflerin ölçekteki satırları (app.py: ESKI_NOTLAR -> DC, DD, F).
+function eskiNotHarfleri() {
+    return AYARLAR.notOlcegi.filter((satir) => AYARLAR.eskiNotlar.includes(satir.harf));
+}
+
+// Tekrar alınan dersin eski notu (ölçekteki satırı). Ders ilk kez alınıyorsa null.
+function eskiNot(ders) {
+    return eskiNotHarfleri().find((satir) => satir.harf === ders.tekrar_eski_not) || null;
+}
+
 // GPA hesabı. Sadece "GPA'ya dahil" işaretli, hedef harfi ve seçilen birimde kredisi olan dersler girer.
+// Tekrar alınan ders önceki toplamda eski notuyla zaten vardır: eski kredisi ve kredi × eski harf puanı
+// önceki toplamdan çıkarılır, ders yeni harfiyle bir kez sayılır.
 function gpaHesapla(ayarlar) {
     let donemKredisi = 0;   // Kd
     let donemPuani = 0;     // Pd = Σ(kredi × harf puanı)
+    let tekrarKredisi = 0;  // Kt = tekrar alınan derslerin kredisi
+    let tekrarPuani = 0;    // Pt = Σ(kredi × eski harf puanı)
     for (const ders of dersler) {
         const kredi = ders[ayarlar.kredi_birimi];
         const harf = gecerliHarf(ders);
         if (!ders.gpaya_dahil || kredi == null || !harf) continue;
         donemKredisi += kredi;
         donemPuani += kredi * harf.katsayi;
+        const eski = eskiNot(ders);
+        if (eski) {
+            tekrarKredisi += kredi;
+            tekrarPuani += kredi * eski.katsayi;
+        }
     }
     if (donemKredisi <= 0) return null;   // hesaba giren ders yok
 
@@ -526,8 +545,12 @@ function gpaHesapla(ayarlar) {
     const ilkDonem = oncekiKredi === 0;
     if (oncekiKredi === null || (!ilkDonem && ayarlar.onceki_gpa === null)) return sonuc;   // genel GPA hesaplanamaz
 
-    const oncekiPuan = ilkDonem ? 0 : oncekiKredi * ayarlar.onceki_gpa;   // Kp × Gp
-    const toplamKredi = oncekiKredi + donemKredisi;
+    // Önceki toplamdan tekrar derslerinin eski kredisi ve puanı çıkar (Kp − Kt, Kp × Gp − Pt).
+    // Girilen önceki kredi tekrar derslerini karşılamıyorsa (tutarsız giriş) toplamlar 0'ın altına inmez.
+    sonuc.tekrarFazla = tekrarKredisi > oncekiKredi;
+    const kalanKredi = Math.max(0, oncekiKredi - tekrarKredisi);
+    const oncekiPuan = ilkDonem ? 0 : Math.max(0, oncekiKredi * ayarlar.onceki_gpa - tekrarPuani);
+    const toplamKredi = kalanKredi + donemKredisi;
     sonuc.oncekiKredi = oncekiKredi;
     sonuc.oncekiGpa = ilkDonem ? null : ayarlar.onceki_gpa;
     sonuc.toplamKredi = toplamKredi;
@@ -583,6 +606,11 @@ function gpaKartiniCiz(sonuc) {
     kart.appendChild(eleman("p", "kucuk-not",
         `Şu an: ${suAn} · Bu dönem ortalaman: ${gpaYaz(sonuc.donemGpa)} · Toplam kredi: ${ikiOndalik(sonuc.oncekiKredi)} → ${ikiOndalik(sonuc.toplamKredi)}`));
 
+    if (sonuc.tekrarFazla) {
+        kart.appendChild(eleman("p", "kucuk-not",
+            "Tekrar alınan derslerin kredisi önceki toplam krediden fazla: önceki krediyi ya da eski notları kontrol et."));
+    }
+
     if (renk === "sari") {
         kart.appendChild(eleman("p", "", `Hedef GPA için bu dönem ortalaman en az ${gpaYaz(sonuc.gerekenDonemGpa)} olmalı.`));
         if (sonuc.gerekenDonemGpa > 4) {
@@ -607,7 +635,7 @@ function gpaTablosunuCiz(krediBirimi) {
 
     if (dersler.length > 0) {
         const baslik = gpaTablosu.createTHead().insertRow();
-        baslik.append(eleman("th", "", "Ders"), eleman("th", "", birimAdi), eleman("th", "", "Hedef harf"),
+        baslik.append(eleman("th", "", "Ders"), eleman("th", "", birimAdi), eleman("th", "", "Eski not"), eleman("th", "", "Hedef harf"),
             eleman("th", "", "Harf puanı"), eleman("th", "", "GPA'ya dahil"));
     }
     const govde = gpaTablosu.createTBody();
@@ -624,8 +652,35 @@ function gpaTablosunuCiz(krediBirimi) {
         dersHucresi.append(nokta, eleman("span", "", ders.kod));
         if (kredi == null) dersHucresi.appendChild(eleman("span", "satir-uyarisi", `${birimAdi} girilmemiş`));
         if (!harf) dersHucresi.appendChild(eleman("span", "satir-uyarisi", "Hedef harf seçilmemiş"));
+        // Tekrar alınan ders: eski notu gösteren rozet; hedef eski nottan düşükse sarı uyarı.
+        const eski = eskiNot(ders);
+        if (eski) {
+            dersHucresi.appendChild(eleman("span", "hap soluk", `Tekrar · eski ${eski.harf}`));
+            if (harf && harf.katsayi < eski.katsayi) {
+                dersHucresi.appendChild(eleman("span", "satir-uyarisi", `Hedef eski nottan (${eski.harf}) düşük`));
+            }
+        }
 
         satir.insertCell().textContent = kredi == null ? "—" : kredi;
+
+        // "Eski not" derse kaydedilen bir ayardır (simülasyon değil): değişince hemen kaydedilir.
+        const eskiListe = eleman("select");
+        eskiListe.setAttribute("aria-label", `${ders.kod}: eski not (tekrar alınıyorsa)`);
+        eskiListe.add(new Option("— İlk kez alıyorum", ""));
+        for (const secenek of eskiNotHarfleri()) {
+            eskiListe.add(new Option(secenek.katsayi > 0 ? secenek.harf : `${secenek.harf} (kaldım)`, secenek.harf));
+        }
+        eskiListe.value = eski ? eski.harf : "";
+        eskiListe.addEventListener("change", async () => {
+            try {
+                await istekGonder("PUT", `/api/dersler/${ders.id}/gpa`, { tekrar_eski_not: eskiListe.value });
+                ders.tekrar_eski_not = eskiListe.value || null;
+            } catch (hata) {
+                mesajGoster(gpaHatasi, hata.message);
+            }
+            gpaCiz();
+        });
+        satir.insertCell().appendChild(eskiListe);
 
         // Hedef harf listesi. "Seç" sadece derse kayıtlı geçerli bir hedef yoksa bulunur.
         const kayitliHarf = hedefHarfleri().some((h) => h.harf === ders.hedef_not) ? ders.hedef_not : "";
