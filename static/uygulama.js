@@ -1655,7 +1655,20 @@ async function puaniKaydet(kalemId, girdi) {
     // yeniden hesapla (liste yeniden çizilmez, böylece bir sonraki alana geçmiş imleç kaybolmaz).
     kalem.alinan_puan = puan;
     girdi.value = puan ?? "";
-    if (seciliDers()) hesabiCiz(seciliDers());
+    if (seciliDers()) kaydirmayiKoruyarakHesabiCiz(seciliDers());
+}
+
+// "Sonuç" kartı kalem listesinin üstünde durur; yeniden çizilince boyu değişebilir (mesaj ya da
+// "Henüz puan girilmedi" satırı gelip gider). Kalem listesi ekranda yerinden oynamasın diye
+// kartın boyundaki fark kadar kaydırma düzeltilir; böylece her puandan sonra aşağı kaydırmak gerekmez.
+function kaydirmayiKoruyarakHesabiCiz(ders) {
+    const kaydirici = kalemListesi.closest(".sekme-icerigi");
+    const listeKonumu = () => kalemListesi.getBoundingClientRect().top
+        - kaydirici.getBoundingClientRect().top + kaydirici.scrollTop;
+    const kaydirma = kaydirici.scrollTop;
+    const oncekiKonum = listeKonumu();
+    hesabiCiz(ders);
+    kaydirici.scrollTop = kaydirma + (listeKonumu() - oncekiKonum);
 }
 
 // "Sonuç" kartını çizer. Solda halka: kazanılan puanın hedef harfin eşiğine oranı (en fazla %100).
