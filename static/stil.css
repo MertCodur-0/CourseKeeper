@@ -1178,6 +1178,12 @@ body {
     outline-offset: -1px;
 }
 
+/* Günü belli olmayan final (final döneminin her gününde görünür): soluk, kesik çizgili. */
+.serit-etiketi.tarihsiz {
+    opacity: 0.7;
+    border: 1px dashed currentColor;
+}
+
 /* Kutu: bloğun görünen ve tıklanan kısmı. Rengi ve şekli (clip-path) JavaScript'ten gelir.
    Şeklin dışında kalan boş kısımlar fare olaylarını almaz. */
 .blok-kutu {

@@ -451,8 +451,24 @@ function basliklariYaz(hafta) {
         `${ilk.getDate()} ${AY_KISALTMALARI[ilk.getMonth()]} – ${son.getDate()} ${AY_KISALTMALARI[son.getMonth()]} ${son.getFullYear()}`;
 }
 
+// O tarihte haftalık dersler var mı? Dönem tanımlıysa sadece derslerin ilk ve son günü arasında
+// (final dönemi hariç). Dönem girilmemişse dersler her hafta görünür.
+function dersYapilanTarihMi(tarih) {
+    const donem = yoklamaVerisi.donem;
+    if (!donem) return true;
+    return (!donem.baslangic || tarih >= donem.baslangic) && (!donem.bitis || tarih <= donem.bitis);
+}
+
+// Tarih, Dönem ekranında girilen final dönemi içinde mi? (Bitiş yoksa tek gün sayılır.)
+function finalDonemindeMi(tarih) {
+    const donem = yoklamaVerisi.donem;
+    if (!donem || !donem.final_baslangic) return false;
+    return tarih >= donem.final_baslangic && tarih <= (donem.final_bitis || donem.final_baslangic);
+}
+
 // Takvimi gösterilen haftaya göre baştan çizer.
-// Düzenli ders blokları her haftada, sınavlar sadece tarihlerinin düştüğü haftada görünür.
+// Düzenli ders blokları dönem boyunca her haftada, sınavlar sadece tarihlerinin düştüğü haftada görünür.
+// Tarihi belli olmayan finaller final döneminin her gününde şeritte görünür.
 function takvimiCiz() {
     izgara.querySelectorAll(".ders-blogu, .serit-etiketi").forEach((eleman) => eleman.remove());
 
@@ -465,11 +481,13 @@ function takvimiCiz() {
         const tarih = tarihYazisi(hafta[gun]);
         const seritHucresi = izgara.querySelector(`.serit-hucre[data-gun="${gun}"]`);
         const yerlesimler = [];
+        const dersVar = dersYapilanTarihMi(tarih);
+        const finalDonemi = finalDonemindeMi(tarih);
 
         for (const ders of dersler) {
-            // Haftalık oturumlar
+            // Haftalık oturumlar (dönem tanımlıysa sadece derslerin ilk ve son günü arasında)
             for (const oturum of ders.oturumlar) {
-                if (oturum.gun !== gun) continue;
+                if (!dersVar || oturum.gun !== gun) continue;
                 // Takvimin dışına taşan kısım kırpılır (09:00 öncesi, 21:00 sonrası).
                 const aralik = saatAraligi(oturum.baslangic, oturum.bitis);
                 const bas = Math.max(aralik.bas, AYARLAR.ilkSaat);
@@ -510,6 +528,20 @@ function takvimiCiz() {
                     let yazi = `${ders.kod} · ${etiket}`;
                     if (kalem.saat) yazi += ` · ${kalem.saat}` + (kalem.bitis_saat ? `-${kalem.bitis_saat}` : "");
                     seritHucresi.appendChild(seritEtiketiOlustur(ders, yazi, kalem.id));
+                    seritDolu = true;
+                }
+            }
+
+            // Tarihi belli olmayan final: final dönemindeki her gün şeritte "FİNAL ?" etiketiyle görünür.
+            if (finalDonemi) {
+                for (const kalem of ders.degerlendirmeler) {
+                    if (kalem.tur !== "final" || kalem.tarih) continue;
+                    const etiket = seritEtiketiOlustur(ders, `${ders.kod} · FİNAL ?`, kalem.id);
+                    etiket.classList.add("tarihsiz");
+                    etiket.title = `${ders.kod} · Final dönemi (${kisaTarih(yoklamaVerisi.donem.final_baslangic)}`
+                        + ` – ${kisaTarih(yoklamaVerisi.donem.final_bitis || yoklamaVerisi.donem.final_baslangic)}),`
+                        + " günü ve saati belli değil";
+                    seritHucresi.appendChild(etiket);
                     seritDolu = true;
                 }
             }
