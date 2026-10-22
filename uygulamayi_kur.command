@@ -36,6 +36,10 @@ rm -f "$GECICI"
 # Simge ve uygulama bilgileri.
 cp mac/AppIcon.icns "$UYGULAMA/Contents/Resources/applet.icns"
 PLIST="$UYGULAMA/Contents/Info.plist"
+# Yeni macOS sürümleri simgeyi önce Assets.car'dan (CFBundleIconName) alır; orada AppleScript'in
+# varsayılan (kâğıt rulosu) simgesi var. İkisini de kaldır ki applet.icns'teki simge kullanılsın.
+rm -f "$UYGULAMA/Contents/Resources/Assets.car"
+/usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$PLIST" 2>/dev/null
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.mertcodur.coursekeeper" "$PLIST" 2>/dev/null \
     || /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string com.mertcodur.coursekeeper" "$PLIST"
 /usr/libexec/PlistBuddy -c "Set :CFBundleName CourseKeeper" "$PLIST" 2>/dev/null \
