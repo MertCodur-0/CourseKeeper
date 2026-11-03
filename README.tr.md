@@ -74,7 +74,7 @@ venv/bin/python app.py
 - İnternet yalnızca şunlar için kullanılır:
   - Syllabus ve akademik takvim okuma (yüklenen dosya Gemini API'ye gönderilir, uygulamada saklanmaz),
   - Hava durumu ([Open-Meteo](https://open-meteo.com), anahtar gerektirmez; konum yaklaşık 1 km'ye yuvarlanarak gönderilir).
-- `derstakip.db` dosyasının yedeğini düzenli olarak almanı öneririm.
+- Uygulama her gün ilk açılışta `derstakip.db` dosyasının yedeğini `yedekler/` klasörüne alır ve son 7 günün yedeğini tutar. Geri dönmek için uygulamayı kapatıp istediğin yedeği `derstakip.db` adıyla proje klasörüne kopyala. Bilgisayar bozulmasına karşı bu klasörü ara sıra başka bir yere de kopyalamanı öneririm.
 
 ## Teknolojiler
 
@@ -93,6 +93,7 @@ hava.py              Hava durumu (Open-Meteo)
 templates/index.html Sayfa
 static/              JavaScript ve CSS
 baslat.command       Çift tıkla başlatma dosyası
+tests/               Testler (çalıştırmak için: testleri_calistir.command)
 ```
 
 ## Notlar

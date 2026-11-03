@@ -79,7 +79,7 @@ venv/bin/python app.py
 - The internet is used only for:
   - Reading syllabi and academic calendars (the uploaded file is sent to the Gemini API and is not stored by the app),
   - Weather ([Open-Meteo](https://open-meteo.com), no key needed; your location is rounded to about 1 km before it is sent).
-- Back up `derstakip.db` regularly.
+- On the first launch of each day the app copies `derstakip.db` into the `yedekler/` folder and keeps the last 7 days. To restore, quit the app and copy the backup you want to the project folder as `derstakip.db`. Copying this folder somewhere else now and then protects you against losing the computer.
 
 ## Tech stack
 
@@ -98,6 +98,7 @@ hava.py              Weather (Open-Meteo)
 templates/index.html Page
 static/              JavaScript and CSS
 baslat.command       Double-click launcher
+tests/               Tests (run with testleri_calistir.command)
 ```
 
 ## Notes

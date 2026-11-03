@@ -21,3 +21,6 @@ hava_onbellek.json
 
 # Yüklenen syllabus dosyaları (kişisel veri; klasörü uygulama kendisi oluşturur)
 uploads/
+
+# Günlük otomatik veritabanı yedekleri (kişisel veri)
+yedekler/

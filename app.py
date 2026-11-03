@@ -19,6 +19,10 @@ from syllabus import SyllabusHatasi
 # Veritabanı dosyası proje klasöründe durur.
 PROJE_KLASORU = Path(__file__).parent
 VERITABANI_DOSYASI = PROJE_KLASORU / "derstakip.db"
+# Günlük otomatik yedekler bu klasörde durur (git'e girmez). Son YEDEK_SAYISI gün tutulur, eskileri silinir.
+# Veri dönüşümünden önce alınan (-donusum-oncesi) ve elle alınmış (-elle) yedeklere dokunulmaz.
+YEDEK_KLASORU = PROJE_KLASORU / "yedekler"
+YEDEK_SAYISI = 7
 
 # Gizli ayarlar (GEMINI_API_KEY, GEMINI_MODEL) bu dosyadan okunur. Anahtar koda yazılmaz.
 ENV_DOSYASI = PROJE_KLASORU / ".env"
@@ -280,6 +284,48 @@ def veritabani_baglan():
     return baglanti
 
 
+def gunluk_yedek_al():
+    """Bugünün yedeği yoksa veritabanını yedekler klasörüne kopyalar, en eski yedekleri siler.
+
+    Sunucu açılırken ve (günlerce açık kalırsa) her gün ilk istekte çağrılır.
+    Yedek dosyasının adı: derstakip.backup-2026-11-03.db
+    """
+    global son_yedek_gunu
+    bugun = date.today().isoformat()
+    if son_yedek_gunu == bugun or not VERITABANI_DOSYASI.exists():
+        return
+    son_yedek_gunu = bugun
+    yedek = YEDEK_KLASORU / f"derstakip.backup-{bugun}.db"
+    if not yedek.exists():
+        try:
+            YEDEK_KLASORU.mkdir(exist_ok=True)
+            # SQLite'ın kendi yedekleme yolu: sunucu o sırada veritabanına yazsa bile yedek bozulmaz.
+            kaynak = sqlite3.connect(VERITABANI_DOSYASI)
+            hedef = sqlite3.connect(yedek)
+            with hedef:
+                kaynak.backup(hedef)
+            hedef.close()
+            kaynak.close()
+        except (OSError, sqlite3.Error) as hata:
+            print(f"Otomatik yedek alınamadı: {hata}")
+            dosyayi_sil(yedek)   # yarım kalan yedek sonraki açılışta yeniden denensin
+            son_yedek_gunu = None
+            return
+    # Ad tarih içerdiği için alfabetik sıra = tarih sırası. Sadece günlük yedekler (YYYY-AA-GG) sayılır.
+    yedekler = sorted(YEDEK_KLASORU.glob("derstakip.backup-????-??-??.db"))
+    for eski in yedekler[:-YEDEK_SAYISI]:
+        dosyayi_sil(eski)
+
+
+# Bugünün yedeği alındıysa tarihi (her istekte diske bakmamak için).
+son_yedek_gunu = None
+
+
+@app.before_request
+def yedegi_kontrol_et():
+    gunluk_yedek_al()
+
+
 def veritabani_hazirla():
     """Veritabanı dosyasını ve tabloları (yoksa) oluşturur, eski veritabanını günceller."""
     baglanti = veritabani_baglan()
@@ -341,8 +387,8 @@ def veritabani_hazirla():
             final_bitis     TEXT
         );
 
-        -- Dönem içinde ders yapılmayan tarihler (tatil, sınav dönemi...). İleride devamsızlık
-        -- hesabında kullanılacak.
+        -- Dönem içinde ders yapılmayan tarihler (tatil, sınav dönemi...). Devamsızlık hesabında
+        -- bu günler planlanan derslerden çıkarılır (static/yoklama.js: planlananTarihler).
         CREATE TABLE IF NOT EXISTS ders_disi_tarihler (
             id        INTEGER PRIMARY KEY,
             tur       TEXT NOT NULL,              -- DERS_DISI_TURLERI listesindeki anahtar
@@ -475,7 +521,8 @@ def veri_surumunu_yukselt(baglanti):
             ).fetchall()
             donusecekler = [k for k in puanli_kalemler if k["tur"] not in YUZ_UZERINDEN_TURLER]
             if donusecekler:
-                yedek = PROJE_KLASORU / f"derstakip.backup-{datetime.now():%Y-%m-%d-%H%M%S}-donusum-oncesi.db"
+                YEDEK_KLASORU.mkdir(exist_ok=True)
+                yedek = YEDEK_KLASORU / f"derstakip.backup-{datetime.now():%Y-%m-%d-%H%M%S}-donusum-oncesi.db"
                 shutil.copy2(VERITABANI_DOSYASI, yedek)
                 print(f"Veri dönüşümü (sürüm 1): {len(donusecekler)} kalem dönüştürülüyor. Yedek: {yedek.name}")
 
@@ -542,7 +589,8 @@ def yoklamayi_dilimlere_ac(baglanti):
         " LEFT JOIN dersler d ON d.id = o.ders_id"
     ).fetchall()
     if eski_kayitlar:
-        yedek = PROJE_KLASORU / f"derstakip.backup-{datetime.now():%Y-%m-%d-%H%M%S}-donusum-oncesi.db"
+        YEDEK_KLASORU.mkdir(exist_ok=True)
+        yedek = YEDEK_KLASORU / f"derstakip.backup-{datetime.now():%Y-%m-%d-%H%M%S}-donusum-oncesi.db"
         shutil.copy2(VERITABANI_DOSYASI, yedek)
         print(f"Veri dönüşümü (sürüm 2): {len(eski_kayitlar)} yoklama kaydı saatlere açılıyor. Yedek: {yedek.name}")
 
@@ -1892,6 +1940,8 @@ def api_ders_sil(ders_id):
 
 
 if __name__ == "__main__":
+    # Yedek, veritabanı güncellenmeden ÖNCE alınır (güncelleme bir şeyi bozarsa dünkü hali durur).
+    gunluk_yedek_al()
     veritabani_hazirla()
     eski_gecici_dosyalari_sil()
 
